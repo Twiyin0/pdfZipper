@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本比较 - 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .editor-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+    .editor-wrap label { font-size:12px; font-weight:700; color:#6b7280; display:block; margin-bottom:5px; }
+    textarea {
+      width:100%; height:200px; padding:10px 12px;
+      border:1.5px solid #e5e7eb; border-radius:9px; resize:vertical;
+      font-size:13px; font-family:monospace; outline:none; transition:border-color 0.15s;
+    }
+    textarea:focus { border-color:#6366f1; }
+
+    .diff-opts { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+    .diff-opts span { font-size:12px; font-weight:600; color:#6b7280; }
+    .mode-btn { padding:5px 12px; border:1.5px solid #e5e7eb; border-radius:7px; background:#fff; font-size:12px; font-weight:600; color:#374151; cursor:pointer; transition:all 0.15s; }
+    .mode-btn.active { border-color:#6366f1; background:#ede9fe; color:#4f46e5; }
+
+    .diff-output { font-family:monospace; font-size:12px; line-height:1.7; border:1.5px solid #e5e7eb; border-radius:9px; overflow:auto; max-height:420px; }
+    .diff-line { display:flex; }
+    .diff-no { width:36px; min-width:36px; text-align:right; padding:0 6px; color:#9ca3af; background:#f9fafb; border-right:1px solid #e5e7eb; user-select:none; font-size:11px; line-height:1.7; }
+    .diff-content { padding:0 10px; white-space:pre-wrap; word-break:break-all; flex:1; }
+    .diff-line.add .diff-no,.diff-line.add .diff-content { background:#f0fdf4; }
+    .diff-line.add .diff-content { color:#15803d; }
+    .diff-line.del .diff-no,.diff-line.del .diff-content { background:#fef2f2; }
+    .diff-line.del .diff-content { color:#b91c1c; text-decoration:line-through; }
+    .diff-line.eq  .diff-content { color:#374151; }
+    ins  { background:#bbf7d0; border-radius:2px; text-decoration:none; }
+    del  { background:#fecaca; border-radius:2px; }
+    .diff-header { padding:10px 14px; background:#f9fafb; border-bottom:1px solid #e5e7eb; font-size:12px; color:#6b7280; display:flex; gap:16px; }
+    .diff-stat { font-weight:600; }
+    .diff-stat.add { color:#059669; }
+    .diff-stat.del { color:#dc2626; }
+
+    .empty-hint { padding:24px; text-align:center; color:#9ca3af; font-size:13px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">🧰 工具箱</a>
+  <span style="font-size:13px;color:#6b7280;font-weight:600">🔀 文本比较</span>
+</nav>
+
+<div class="page" style="padding-top:24px;padding-bottom:40px">
+<div class="card card-wide" style="max-width:900px">
+  <h1>文本比较</h1>
+  <p class="subtitle">对比两段文本 / 代码 / JSON 的差异，高亮标注增删内容</p>
+
+  <div class="editor-row">
+    <div class="editor-wrap">
+      <label>文本 A（原始）</label>
+      <textarea id="textA" placeholder="粘贴原始文本..."></textarea>
+    </div>
+    <div class="editor-wrap">
+      <label>文本 B（修改后）</label>
+      <textarea id="textB" placeholder="粘贴修改后文本..."></textarea>
+    </div>
+  </div>
+
+  <div class="diff-opts">
+    <span>比较方式</span>
+    <button class="mode-btn active" data-mode="line">逐行</button>
+    <button class="mode-btn" data-mode="word">逐词</button>
+    <button class="mode-btn" data-mode="char">逐字符</button>
+    <button class="btn btn-gray" id="swapBtn" style="margin-left:auto;padding:6px 14px;font-size:12px">⇄ 交换 A/B</button>
+    <button class="btn btn-primary" id="diffBtn" style="margin-top:0;width:auto;padding:8px 20px">对比</button>
+  </div>
+
+  <div class="diff-output" id="diffOutput">
+    <div class="empty-hint">输入文本后点击「对比」查看差异</div>
+  </div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let mode = 'line';
+
+document.querySelectorAll('.mode-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); mode = b.dataset.mode;
+  });
+});
+
+$('swapBtn').addEventListener('click', () => {
+  const t = $('textA').value; $('textA').value = $('textB').value; $('textB').value = t;
+});
+
+$('diffBtn').addEventListener('click', () => {
+  const a = $('textA').value, b = $('textB').value;
+  if (!a && !b) { $('diffOutput').innerHTML = '<div class="empty-hint">请先输入文本</div>'; return; }
+
+  let parts, addCount = 0, delCount = 0;
+  if (mode === 'line') parts = Diff.diffLines(a, b);
+  else if (mode === 'word') parts = Diff.diffWords(a, b);
+  else parts = Diff.diffChars(a, b);
+
+  parts.forEach(p => { if (p.added) addCount += p.count || 1; if (p.removed) delCount += p.count || 1; });
+
+  if (mode === 'line') {
+    renderLineDiff(parts, addCount, delCount);
+  } else {
+    renderInlineDiff(parts, addCount, delCount);
+  }
+});
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderLineDiff(parts, addCount, delCount) {
+  let html = `<div class="diff-header">
+    <span class="diff-stat add">+ ${addCount} 行新增</span>
+    <span class="diff-stat del">− ${delCount} 行删除</span>
+  </div>`;
+  let lineNo = 1;
+  parts.forEach(part => {
+    const lines = part.value.split('\n');
+    if (lines[lines.length - 1] === '') lines.pop();
+    const cls = part.added ? 'add' : part.removed ? 'del' : 'eq';
+    const prefix = part.added ? '+' : part.removed ? '−' : ' ';
+    lines.forEach(line => {
+      html += `<div class="diff-line ${cls}"><span class="diff-no">${cls !== 'del' ? lineNo++ : '−'}</span><span class="diff-content">${prefix} ${esc(line)}</span></div>`;
+    });
+  });
+  if (!html.includes('diff-line')) html += '<div class="empty-hint">两段文本完全相同 ✓</div>';
+  $('diffOutput').innerHTML = html;
+}
+
+function renderInlineDiff(parts, addCount, delCount) {
+  const unitLabel = mode === 'word' ? '词' : '字符';
+  let html = `<div class="diff-header">
+    <span class="diff-stat add">+ ${addCount} ${unitLabel}新增</span>
+    <span class="diff-stat del">− ${delCount} ${unitLabel}删除</span>
+  </div><div class="diff-content" style="padding:12px 14px;white-space:pre-wrap;word-break:break-all">`;
+  parts.forEach(p => {
+    if (p.added) html += `<ins>${esc(p.value)}</ins>`;
+    else if (p.removed) html += `<del>${esc(p.value)}</del>`;
+    else html += esc(p.value);
+  });
+  $('diffOutput').innerHTML = html + '</div>';
+}
+</script>
+</body>
+</html>

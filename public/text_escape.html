@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本转义 - 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .conv-grid { display:flex; flex-direction:column; gap:20px; }
+    .conv-card { border:1.5px solid #e5e7eb; border-radius:12px; overflow:hidden; }
+    .conv-header { padding:10px 14px; background:#f9fafb; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; gap:10px; }
+    .conv-title { font-size:13px; font-weight:700; color:#374151; }
+    .conv-tag { font-size:10px; font-weight:600; padding:2px 7px; border-radius:4px; background:#ede9fe; color:#5b21b6; }
+    .conv-body { padding:14px; display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center; }
+    textarea.cv { width:100%; height:80px; padding:8px 10px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:12px; font-family:monospace; outline:none; resize:vertical; transition:border-color 0.15s; }
+    textarea.cv:focus { border-color:#6366f1; }
+    .arrow-col { display:flex; flex-direction:column; gap:6px; align-items:center; }
+    .arr-btn { padding:6px 10px; border:1.5px solid #e5e7eb; border-radius:7px; background:#fff; font-size:14px; cursor:pointer; transition:all 0.15s; font-weight:700; line-height:1; }
+    .arr-btn:hover { border-color:#6366f1; background:#ede9fe; }
+    .err-msg { font-size:11px; color:#dc2626; margin-top:4px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">🧰 工具箱</a>
+  <span style="font-size:13px;color:#6b7280;font-weight:600">🔤 文本转义</span>
+</nav>
+
+<div class="page">
+<div class="card card-wide" style="max-width:780px">
+  <h1>文本转义</h1>
+  <p class="subtitle">Unicode · Base64 · URL 与纯文本互转，全部在浏览器本地处理</p>
+
+  <div class="conv-grid">
+
+    <!-- Unicode -->
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-title">Unicode 转义</span>
+        <span class="conv-tag">\\uXXXX</span>
+      </div>
+      <div class="conv-body">
+        <div>
+          <label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:3px">纯文本</label>
+          <textarea class="cv" id="uni-text" placeholder="你好世界"></textarea>
+        </div>
+        <div class="arrow-col">
+          <button class="arr-btn" title="文本 → Unicode" onclick="encodeUni()">→</button>
+          <button class="arr-btn" title="Unicode → 文本" onclick="decodeUni()">←</button>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:3px">Unicode 转义</label>
+          <textarea class="cv" id="uni-esc" placeholder="\u4f60\u597d\u4e16\u754c"></textarea>
+          <div class="err-msg" id="uni-err"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Base64 -->
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-title">Base64 编解码</span>
+        <span class="conv-tag">Base64</span>
+      </div>
+      <div class="conv-body">
+        <div>
+          <label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:3px">纯文本（UTF-8）</label>
+          <textarea class="cv" id="b64-text" placeholder="Hello, 世界！"></textarea>
+        </div>
+        <div class="arrow-col">
+          <button class="arr-btn" title="文本 → Base64" onclick="encodeB64()">→</button>
+          <button class="arr-btn" title="Base64 → 文本" onclick="decodeB64()">←</button>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:3px">Base64</label>
+          <textarea class="cv" id="b64-esc" placeholder="SGVsbG8sIOS4lueVjO+8gQ=="></textarea>
+          <div class="err-msg" id="b64-err"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- URL -->
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-title">URL 编解码</span>
+        <span class="conv-tag">encodeURIComponent</span>
+      </div>
+      <div class="conv-body">
+        <div>
+          <label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:3px">原始文本</label>
+          <textarea class="cv" id="url-text" placeholder="https://example.com/搜索?q=你好 世界&page=1"></textarea>
+        </div>
+        <div class="arrow-col">
+          <button class="arr-btn" title="文本 → URL 编码" onclick="encodeURL()">→</button>
+          <button class="arr-btn" title="URL 编码 → 文本" onclick="decodeURL()">←</button>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#9ca3af;display:block;margin-bottom:3px">URL 编码</label>
+          <textarea class="cv" id="url-esc" placeholder="https%3A%2F%2Fexample.com%2F..."></textarea>
+          <div class="err-msg" id="url-err"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+// ── Unicode ──
+function encodeUni() {
+  const s = document.getElementById('uni-text').value;
+  document.getElementById('uni-esc').value = [...s].map(c => {
+    const cp = c.codePointAt(0);
+    return cp > 127 ? `\\u${cp.toString(16).padStart(4,'0')}` : c;
+  }).join('');
+  document.getElementById('uni-err').textContent = '';
+}
+function decodeUni() {
+  try {
+    const s = document.getElementById('uni-esc').value;
+    document.getElementById('uni-text').value = s.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+    document.getElementById('uni-err').textContent = '';
+  } catch(e) { document.getElementById('uni-err').textContent = '解码失败：' + e.message; }
+}
+
+// ── Base64 ──
+function encodeB64() {
+  try {
+    const s = document.getElementById('b64-text').value;
+    document.getElementById('b64-esc').value = btoa(unescape(encodeURIComponent(s)));
+    document.getElementById('b64-err').textContent = '';
+  } catch(e) { document.getElementById('b64-err').textContent = '编码失败：' + e.message; }
+}
+function decodeB64() {
+  try {
+    const s = document.getElementById('b64-esc').value.trim();
+    document.getElementById('b64-text').value = decodeURIComponent(escape(atob(s)));
+    document.getElementById('b64-err').textContent = '';
+  } catch(e) { document.getElementById('b64-err').textContent = '解码失败：字符串不是有效 Base64'; }
+}
+
+// ── URL ──
+function encodeURL() {
+  try {
+    document.getElementById('url-esc').value = encodeURIComponent(document.getElementById('url-text').value);
+    document.getElementById('url-err').textContent = '';
+  } catch(e) { document.getElementById('url-err').textContent = '编码失败：' + e.message; }
+}
+function decodeURL() {
+  try {
+    document.getElementById('url-text').value = decodeURIComponent(document.getElementById('url-esc').value);
+    document.getElementById('url-err').textContent = '';
+  } catch(e) { document.getElementById('url-err').textContent = '解码失败：包含无效的 % 序列'; }
+}
+</script>
+</body>
+</html>

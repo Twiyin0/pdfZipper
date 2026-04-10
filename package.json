@@ -1,0 +1,25 @@
+{
+  "name": "pdfzipper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "canvas": "^3.2.3",
+    "express": "^5.2.1",
+    "jsqr": "^1.4.0",
+    "multer": "^2.1.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^2.16.105",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.34.5",
+    "vercel": "^50.43.0"
+  }
+}

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>哈希生成 - 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .tabs { display:flex; gap:0; border-bottom:2px solid #e5e7eb; margin-bottom:20px; }
+    .tab-btn { padding:9px 18px; border:none; background:none; font-size:13px; font-weight:600; color:#6b7280; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all 0.15s; }
+    .tab-btn.active { color:#6366f1; border-bottom-color:#6366f1; }
+    .tab-panel { display:none; } .tab-panel.active { display:block; }
+
+    .form-label { font-size:12px; font-weight:600; color:#6b7280; margin-bottom:5px; display:block; }
+    textarea.form-input { width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:9px; font-size:13px; outline:none; resize:vertical; min-height:100px; font-family:monospace; transition:border-color 0.15s; }
+    textarea.form-input:focus { border-color:#6366f1; }
+
+    .opt-row { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+    .opt-group { display:flex; align-items:center; gap:8px; font-size:13px; color:#374151; }
+    .radio-group { display:flex; gap:4px; }
+    .radio-label { display:flex; align-items:center; gap:4px; cursor:pointer; padding:5px 10px; border:1.5px solid #e5e7eb; border-radius:7px; font-size:12px; font-weight:600; color:#374151; transition:all 0.15s; }
+    .radio-label input { display:none; }
+    .radio-label:has(input:checked) { border-color:#6366f1; background:#ede9fe; color:#4f46e5; }
+
+    .hash-results { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+    .hash-item { background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:9px; padding:12px 14px; }
+    .hash-algo { font-size:11px; font-weight:700; color:#9ca3af; text-transform:uppercase; margin-bottom:4px; }
+    .hash-val { font-family:monospace; font-size:12px; color:#1f2937; word-break:break-all; }
+    .hash-actions { display:flex; justify-content:flex-end; margin-top:6px; }
+    .copy-btn { font-size:11px; padding:3px 10px; background:#e5e7eb; border:none; border-radius:5px; cursor:pointer; color:#374151; transition:background 0.15s; }
+    .copy-btn:hover { background:#d1d5db; }
+
+    .file-badge { display:inline-flex; align-items:center; gap:6px; background:#f5f3ff; color:#5b21b6; font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px; margin-bottom:10px; }
+    .fmtSize { font-size:11px; color:#6b7280; margin-top:3px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">🧰 工具箱</a>
+  <span style="font-size:13px;color:#6b7280;font-weight:600">🔑 哈希散列生成</span>
+</nav>
+
+<div class="page">
+<div class="card">
+  <h1>哈希散列生成</h1>
+  <p class="subtitle">同时输出 MD5 · SHA1 · SHA256 · SHA512，支持文本输入和文件上传</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="text">文本输入</button>
+    <button class="tab-btn" data-tab="file">文件上传</button>
+  </div>
+
+  <!-- 文本 -->
+  <div class="tab-panel active" id="tab-text">
+    <label class="form-label">输入文本</label>
+    <textarea class="form-input" id="textInput" placeholder="在此输入要计算哈希值的文本..."></textarea>
+  </div>
+
+  <!-- 文件 -->
+  <div class="tab-panel" id="tab-file">
+    <div class="drop-zone" id="fileDrop">
+      <input type="file" id="fileInput">
+      <div class="drop-icon">📂</div>
+      <div class="drop-text">点击选择或拖拽任意文件</div>
+      <div class="drop-hint">支持任意格式，最大 500 MB</div>
+    </div>
+    <div id="fileTag" style="display:none;margin-top:10px">
+      <div class="file-badge" id="fileBadge">📄 <span id="fileName2">文件名</span></div>
+      <div class="fmtSize" id="fileSize2"></div>
+    </div>
+  </div>
+
+  <!-- 选项 -->
+  <div class="opt-row" style="margin-top:16px">
+    <div class="opt-group">
+      <span style="font-size:12px;font-weight:600;color:#6b7280">输出格式</span>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="fmt" value="hex" checked>十六进制</label>
+        <label class="radio-label"><input type="radio" name="fmt" value="base64">Base64</label>
+      </div>
+    </div>
+    <div class="opt-group">
+      <span style="font-size:12px;font-weight:600;color:#6b7280">大小写</span>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="case" value="lower" checked>小写</label>
+        <label class="radio-label"><input type="radio" name="case" value="upper">大写</label>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="hashBtn">计算哈希</button>
+
+  <div class="progress-area" id="hashProgress">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="hashBar"></div></div>
+    <div class="progress-text" id="hashText">计算中...</div>
+  </div>
+
+  <div class="hash-results" id="hashResults"></div>
+</div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(2) + ' MB';
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+let selectedFile = null;
+$('fileInput').addEventListener('change', e => setFile(e.target.files[0]));
+const fd = $('fileDrop');
+fd.addEventListener('dragover', e => { e.preventDefault(); fd.classList.add('drag-over'); });
+fd.addEventListener('dragleave', () => fd.classList.remove('drag-over'));
+fd.addEventListener('drop', e => { e.preventDefault(); fd.classList.remove('drag-over'); setFile(e.dataTransfer.files[0]); });
+
+function setFile(f) {
+  selectedFile = f;
+  $('fileName2').textContent = f.name; $('fileSize2').textContent = fmtSize(f.size);
+  $('fileTag').style.display = 'block';
+}
+
+$('hashBtn').addEventListener('click', async () => {
+  const isFile = document.querySelector('.tab-btn.active').dataset.tab === 'file';
+  if (isFile && !selectedFile) { alert('请先选择文件'); return; }
+  if (!isFile && !$('textInput').value) { alert('请输入文本'); return; }
+
+  $('hashBtn').disabled = true; $('hashBtn').textContent = '计算中...';
+  $('hashResults').innerHTML = '';
+  $('hashProgress').classList.add('show'); $('hashBar').style.width = '0%';
+  $('hashText').textContent = isFile ? `正在读取 ${fmtSize(selectedFile?.size || 0)}...` : '计算中...';
+  setTimeout(() => { $('hashBar').style.width = '70%'; }, 50);
+
+  const form = new FormData();
+  const fmt  = document.querySelector('input[name="fmt"]:checked').value;
+  const upper= document.querySelector('input[name="case"]:checked').value === 'upper';
+  form.append('format', fmt);
+  form.append('uppercase', upper);
+
+  if (isFile) form.append('file', selectedFile);
+  else form.append('text', $('textInput').value);
+
+  try {
+    const data = await fetch('/api/hash', { method: 'POST', body: form }).then(r => r.json());
+    $('hashBar').style.width = '100%';
+    setTimeout(() => $('hashProgress').classList.remove('show'), 300);
+
+    if (!data.success) { $('hashResults').innerHTML = `<p style="color:#991b1b">${data.error}</p>`; return; }
+
+    const labels = { md5:'MD5', sha1:'SHA-1', sha256:'SHA-256', sha512:'SHA-512' };
+    const colors = { md5:'#f0fdf4', sha1:'#eff6ff', sha256:'#faf5ff', sha512:'#fff7ed' };
+    const bcolors = { md5:'#bbf7d0', sha1:'#bfdbfe', sha256:'#ddd6fe', sha512:'#fed7aa' };
+
+    $('hashResults').innerHTML = Object.entries(data.result).map(([k, v]) => `
+      <div class="hash-item" style="background:${colors[k]};border-color:${bcolors[k]}">
+        <div class="hash-algo">${labels[k]} · ${data.fmt === 'base64' ? 'Base64' : '十六进制'}${data.upper ? ' · 大写' : ''}</div>
+        <div class="hash-val" id="hv-${k}">${v}</div>
+        <div class="hash-actions">
+          <button class="copy-btn" onclick="copyHash('${k}')">复制</button>
+        </div>
+      </div>`).join('') + `<div class="info-row" style="margin-top:6px">数据大小：<strong>${fmtSize(data.byteLength)}</strong></div>`;
+  } catch { $('hashResults').innerHTML = '<p style="color:#991b1b">网络错误，请重试</p>'; $('hashProgress').classList.remove('show'); }
+  finally { $('hashBtn').disabled = false; $('hashBtn').textContent = '计算哈希'; }
+});
+
+function copyHash(k) {
+  const v = document.getElementById('hv-' + k)?.textContent;
+  if (!v) return;
+  navigator.clipboard.writeText(v);
+  const btn = document.querySelector(`#hv-${k} ~ .hash-actions .copy-btn`);
+  if (btn) { btn.textContent = '已复制'; setTimeout(() => btn.textContent = '复制', 1500); }
+}
+
+setupPaste(() => true, f => {
+  document.querySelector('[data-tab="file"]').click();
+  setFile(f);
+});
+</script>
+</body>
+</html>

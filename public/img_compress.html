@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图片压缩 - 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .preview-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0; }
+    .preview-box { border:1.5px solid #e5e7eb; border-radius:10px; overflow:hidden; }
+    .preview-label { padding:8px 12px; background:#f9fafb; border-bottom:1px solid #e5e7eb; font-size:11px; font-weight:700; color:#9ca3af; display:flex; justify-content:space-between; }
+    .preview-img-wrap { height:200px; display:flex; align-items:center; justify-content:center; background:#f3f4f6; overflow:hidden; }
+    .preview-img-wrap img { max-width:100%; max-height:100%; object-fit:contain; }
+    .preview-img-wrap .placeholder { font-size:36px; color:#d1d5db; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">🧰 工具箱</a>
+  <span style="font-size:13px;color:#6b7280;font-weight:600">📉 图片压缩</span>
+</nav>
+
+<div class="page">
+<div class="card">
+  <h1>图片压缩</h1>
+  <p class="subtitle">调整质量参数压缩图片，保持原始格式（JPG/PNG/WebP）</p>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept="image/*">
+    <div class="drop-icon">🖼️</div>
+    <div class="drop-text">点击选择或拖拽图片</div>
+    <div class="drop-hint">支持 JPG · PNG · WebP，最大 50 MB</div>
+  </div>
+
+  <div id="options" style="display:none">
+    <div class="preview-row">
+      <div class="preview-box">
+        <div class="preview-label"><span>原图</span><span id="origInfo"></span></div>
+        <div class="preview-img-wrap"><img id="origImg"></div>
+      </div>
+      <div class="preview-box">
+        <div class="preview-label"><span>压缩后预览</span><span id="compInfo"></span></div>
+        <div class="preview-img-wrap" id="compWrap"><div class="placeholder">⏳</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="slider-group">
+        <div class="slider-row">
+          <span class="slider-label">压缩质量</span>
+          <span class="slider-value" id="qualVal">80%</span>
+        </div>
+        <input type="range" id="qualSlider" min="1" max="100" value="80">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="compressBtn">开始压缩</button>
+  </div>
+
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-text" id="progressText">压缩中...</div>
+  </div>
+
+  <div class="result" id="result"></div>
+</div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(2) + ' MB';
+
+let selectedFile = null, _compFile = null;
+
+$('qualSlider').addEventListener('input', () => { $('qualVal').textContent = $('qualSlider').value + '%'; });
+
+function selectFile(f) {
+  if (!f.type.startsWith('image/')) { alert('请选择图片文件'); return; }
+  selectedFile = f;
+  const url = URL.createObjectURL(f);
+  $('origImg').src = url;
+  $('origInfo').textContent = fmtSize(f.size);
+  $('compWrap').innerHTML = '<div class="placeholder">点击压缩后预览</div>';
+  $('compInfo').textContent = '';
+  $('options').style.display = 'block';
+  $('result').classList.remove('show');
+}
+
+$('fileInput').addEventListener('change', e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
+const dz = $('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]); });
+
+$('compressBtn').addEventListener('click', async () => {
+  if (!selectedFile) return;
+  $('compressBtn').disabled = true; $('compressBtn').textContent = '压缩中...';
+  $('progressArea').classList.add('show'); $('progressBar').style.width = '0%';
+  $('progressText').textContent = '正在压缩...';
+  $('result').classList.remove('show');
+  setTimeout(() => { $('progressBar').style.width = '80%'; }, 50);
+
+  const fd = new FormData();
+  fd.append('image', selectedFile);
+  fd.append('quality', $('qualSlider').value);
+
+  try {
+    const data = await fetch('/api/img-compress', { method: 'POST', body: fd }).then(r => r.json());
+    $('progressBar').style.width = '100%';
+    setTimeout(() => $('progressArea').classList.remove('show'), 300);
+
+    if (!data.success) { showError(data.error); return; }
+
+    // 更新压缩后预览
+    _compFile = data.file;
+    $('compInfo').textContent = fmtSize(data.compressedSize);
+    const previewMime = data.ext === 'jpg' ? 'image/jpeg' : `image/${data.ext}`;
+    $('compWrap').innerHTML = `<img src="data:${previewMime};base64,${data.file.data}" style="max-width:100%;max-height:200px;object-fit:contain">`;
+
+    const smaller = data.compressedSize < data.originalSize;
+    const dlName  = selectedFile.name.replace(/\.[^.]+$/, '') + `_compressed.${data.ext}`;
+
+    $('result').classList.add('show');
+    $('result').innerHTML = `
+      <div class="result-header ${smaller?'ok':'warn'}">
+        <span class="result-icon">${smaller?'✅':'ℹ️'}</span>
+        <span class="result-title">${smaller?'压缩成功！':'文件大小未减小'}</span>
+      </div>
+      <div class="result-body">
+        <div class="stats">
+          <div class="stat-box"><div class="stat-value">${fmtSize(data.originalSize)}</div><div class="stat-label">原始大小</div></div>
+          <div class="stat-box"><div class="stat-value ${smaller?'green':'red'}">${fmtSize(data.compressedSize)}</div><div class="stat-label">压缩后</div></div>
+          <div class="stat-box"><div class="stat-value ${smaller?'green':'red'}">${smaller?'-':'+'}${Math.abs(data.ratio)}%</div><div class="stat-label">${smaller?'节省':'增加'}</div></div>
+        </div>
+        <div class="info-row">${data.width} × ${data.height} px · 质量 ${$('qualSlider').value}%</div>
+        <button class="btn btn-success" onclick="downloadFile(_compFile)">⬇ 下载压缩图片</button>
+      </div>`;
+  } catch { showError('网络错误，请重试'); $('progressArea').classList.remove('show'); }
+  finally { $('compressBtn').disabled = false; $('compressBtn').textContent = '开始压缩'; }
+});
+
+function showError(msg) {
+  $('result').classList.add('show');
+  $('result').innerHTML = `<div class="result-header fail"><span class="result-icon">❌</span><span class="result-title">失败</span></div><div class="result-body"><p class="error-msg">${msg}</p></div>`;
+}
+
+setupPaste(t => t.startsWith('image/'), f => selectFile(f));
+</script>
+</body>
+</html>

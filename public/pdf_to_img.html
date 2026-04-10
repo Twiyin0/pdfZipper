@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF 转图片 - PDF 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">📦 PDF 工具箱</a>
+  <div class="nav-links">
+    <a href="/pdf_compress.html">🗜️ 压缩</a>
+    <a href="/pdf_merge.html">🔗 合并</a>
+    <a href="/pdf_split.html">✂️ 拆分</a>
+    <a href="/img_to_pdf.html">🖼️ 图转PDF</a>
+    <a href="/pdf_to_img.html" class="active">📸 PDF转图</a>
+  </div>
+</nav>
+
+<div class="page">
+<div class="card">
+  <h1>PDF 转图片</h1>
+  <p class="subtitle">每页导出为 JPG 图片，打包 ZIP 压缩包下载</p>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".pdf,application/pdf">
+    <div class="drop-icon">📸</div>
+    <div class="drop-text">点击选择或拖拽 PDF 文件</div>
+    <div class="drop-hint">最大支持 200 MB</div>
+  </div>
+
+  <div class="file-list" id="fileInfo" style="display:none">
+    <div class="file-item" style="cursor:default">
+      <span class="fi-icon">📄</span>
+      <div class="fi-details">
+        <div class="fi-name" id="fileName"></div>
+        <div class="fi-meta" id="fileMeta"></div>
+      </div>
+      <button class="fi-remove" id="removeBtn">✕</button>
+    </div>
+  </div>
+
+  <div class="section" id="options" style="display:none">
+    <div class="section-title">输出质量</div>
+    <div class="presets">
+      <button class="preset-btn" data-dpi="72"><div class="preset-name">屏幕</div><div class="preset-desc">72 DPI</div></button>
+      <button class="preset-btn" data-dpi="100"><div class="preset-name">低清</div><div class="preset-desc">100 DPI</div></button>
+      <button class="preset-btn active" data-dpi="150"><div class="preset-name">标准</div><div class="preset-desc">150 DPI</div></button>
+      <button class="preset-btn" data-dpi="200"><div class="preset-name">高清</div><div class="preset-desc">200 DPI</div></button>
+      <button class="preset-btn" data-dpi="300"><div class="preset-name">打印</div><div class="preset-desc">300 DPI</div></button>
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-row">
+        <span class="slider-label">输出分辨率</span>
+        <span class="slider-value" id="dpiVal">150 DPI</span>
+      </div>
+      <input type="range" id="dpiSlider" min="72" max="300" step="1" value="150">
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="convertBtn" disabled>选择文件后开始转换</button>
+
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-text" id="progressText">正在渲染...</div>
+  </div>
+
+  <div class="result" id="result"></div>
+</div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fmtSize = b => b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(2) + ' MB';
+
+let selectedFile = null;
+let _dlFile = null;
+
+// presets
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    $('dpiSlider').value = btn.dataset.dpi;
+    $('dpiVal').textContent = btn.dataset.dpi + ' DPI';
+  });
+});
+$('dpiSlider').addEventListener('input', () => {
+  $('dpiVal').textContent = $('dpiSlider').value + ' DPI';
+  const dpi = parseInt($('dpiSlider').value);
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.dpi) === dpi);
+  });
+});
+
+function selectFile(file) {
+  if (file.type !== 'application/pdf') { alert('请选择 PDF 文件'); return; }
+  selectedFile = file;
+  $('fileName').textContent = file.name;
+  $('fileMeta').textContent = fmtSize(file.size);
+  $('fileInfo').style.display = 'flex';
+  $('options').style.display = 'block';
+  $('convertBtn').disabled = false;
+  $('convertBtn').textContent = '开始转换';
+  $('result').classList.remove('show');
+}
+
+$('fileInput').addEventListener('change', e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
+$('removeBtn').addEventListener('click', () => {
+  selectedFile = null; $('fileInput').value = '';
+  $('fileInfo').style.display = 'none';
+  $('options').style.display = 'none';
+  $('convertBtn').disabled = true;
+  $('convertBtn').textContent = '选择文件后开始转换';
+  $('result').classList.remove('show');
+});
+
+const dz = $('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]); });
+
+function animateTo(target, ms) {
+  const start = parseFloat($('progressBar').style.width) || 0;
+  const t0 = Date.now();
+  (function step() {
+    const pct = Math.min(start + (target - start) * (Date.now() - t0) / ms, target);
+    $('progressBar').style.width = pct + '%';
+    if (pct < target) requestAnimationFrame(step);
+  })();
+}
+
+$('convertBtn').addEventListener('click', async () => {
+  if (!selectedFile) return;
+  const dpi = parseInt($('dpiSlider').value);
+  $('convertBtn').disabled = true; $('convertBtn').textContent = '转换中...';
+  $('result').classList.remove('show');
+  $('progressArea').classList.add('show'); $('progressBar').style.width = '0%';
+  $('progressText').textContent = '正在上传...';
+  animateTo(20, 400);
+
+  const fd = new FormData();
+  fd.append('pdf', selectedFile);
+  fd.append('dpi', dpi);
+
+  try {
+    $('progressText').textContent = `渲染页面 (${dpi} DPI)，请稍候...`;
+    animateTo(88, 3000);
+    const data = await fetch('/api/pdf-to-img', { method: 'POST', body: fd }).then(r => r.json());
+    $('progressBar').style.width = '100%'; $('progressText').textContent = '打包完成';
+    setTimeout(() => { $('progressArea').classList.remove('show'); showResult(data, dpi); }, 350);
+  } catch { $('progressArea').classList.remove('show'); showError('网络错误，请重试'); }
+  finally { $('convertBtn').disabled = false; $('convertBtn').textContent = '重新转换'; }
+});
+
+function showResult(data, dpi) {
+  const r = $('result'); r.classList.add('show');
+  if (!data.success) { r.innerHTML = failHtml(data.error); return; }
+  const baseName = selectedFile.name.replace(/\.pdf$/i, '');
+
+  _dlFile = data.file;
+  if (data.singleImage) {
+    r.innerHTML = `
+      <div class="result-header ok"><span class="result-icon">✅</span><span class="result-title">转换成功！</span></div>
+      <div class="result-body">
+        <div class="stats">
+          <div class="stat-box"><div class="stat-value green">1</div><div class="stat-label">图片张数</div></div>
+          <div class="stat-box"><div class="stat-value">${dpi} DPI</div><div class="stat-label">输出分辨率</div></div>
+          <div class="stat-box"><div class="stat-value">JPG</div><div class="stat-label">图片格式</div></div>
+        </div>
+        <div class="info-row">单页 PDF，直接输出 <strong>JPG 图片</strong></div>
+        <button class="btn btn-success" onclick="downloadFile(_dlFile)">⬇ 下载 JPG 图片</button>
+      </div>`;
+  } else {
+    r.innerHTML = `
+      <div class="result-header ok"><span class="result-icon">✅</span><span class="result-title">转换成功！</span></div>
+      <div class="result-body">
+        <div class="stats">
+          <div class="stat-box"><div class="stat-value green">${data.pageCount}</div><div class="stat-label">图片张数</div></div>
+          <div class="stat-box"><div class="stat-value">${dpi} DPI</div><div class="stat-label">输出分辨率</div></div>
+          <div class="stat-box"><div class="stat-value">JPG</div><div class="stat-label">图片格式</div></div>
+        </div>
+        <div class="info-row">共 <strong>${data.pageCount}</strong> 张 JPG，打包为 <strong>ZIP</strong></div>
+        <button class="btn btn-success" onclick="downloadFile(_dlFile)">⬇ 下载 ZIP 压缩包</button>
+      </div>`;
+  }
+}
+function showError(msg) { $('result').classList.add('show'); $('result').innerHTML = failHtml(msg); }
+function failHtml(msg) {
+  return `<div class="result-header fail"><span class="result-icon">❌</span><span class="result-title">失败</span></div><div class="result-body"><p class="error-msg">${msg}</p></div>`;
+}
+
+setupPaste(t => t === 'application/pdf', f => selectFile(f));
+</script>
+</body>
+</html>

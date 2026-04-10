@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSON 格式化 - 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+    .tb-btn { padding:6px 14px; border:1.5px solid #e5e7eb; border-radius:7px; background:#fff; font-size:13px; font-weight:600; color:#374151; cursor:pointer; transition:all 0.15s; }
+    .tb-btn:hover { border-color:#6366f1; background:#f5f3ff; color:#4f46e5; }
+    .tb-btn.primary { background:#6366f1; color:#fff; border-color:#6366f1; }
+    .tb-btn.primary:hover { background:#4f46e5; }
+    .tb-btn.danger { background:#fef2f2; color:#dc2626; border-color:#fecaca; }
+    .tb-btn.danger:hover { background:#fee2e2; }
+    .indent-select { padding:6px 10px; border:1.5px solid #e5e7eb; border-radius:7px; font-size:13px; outline:none; }
+    .indent-select:focus { border-color:#6366f1; }
+
+    .editors { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .editor-wrap { display:flex; flex-direction:column; }
+    .editor-wrap label { font-size:11px; font-weight:700; color:#9ca3af; margin-bottom:5px; display:flex; justify-content:space-between; }
+    textarea.json-ta {
+      flex:1; min-height:400px; padding:12px; border:1.5px solid #e5e7eb; border-radius:9px;
+      font-family:'Cascadia Code','Fira Code',monospace; font-size:12px; resize:vertical;
+      outline:none; transition:border-color 0.15s; line-height:1.6;
+    }
+    textarea.json-ta:focus { border-color:#6366f1; }
+    textarea.json-ta.ok   { border-color:#6ee7b7; }
+    textarea.json-ta.err  { border-color:#fca5a5; }
+
+    .status-bar { height:28px; display:flex; align-items:center; gap:8px; font-size:11px; color:#6b7280; padding-top:4px; }
+    .status-ok  { color:#059669; font-weight:600; }
+    .status-err { color:#dc2626; font-weight:600; }
+    .char-count { margin-left:auto; color:#9ca3af; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">🧰 工具箱</a>
+  <span style="font-size:13px;color:#6b7280;font-weight:600">{ } JSON 格式化</span>
+</nav>
+
+<div class="page" style="padding-top:24px;padding-bottom:40px">
+<div class="card" style="max-width:1000px">
+  <h1>JSON 格式化</h1>
+  <p class="subtitle">美化 / 压缩 / 校验 JSON，在浏览器本地处理，数据不上传</p>
+
+  <div class="toolbar">
+    <button class="tb-btn primary" onclick="formatJSON()">⚡ 格式化</button>
+    <button class="tb-btn" onclick="minifyJSON()">🗜 压缩</button>
+    <button class="tb-btn" onclick="sortKeys()">↕ 排序 Key</button>
+    <button class="tb-btn" onclick="copyOutput()">📋 复制结果</button>
+    <button class="tb-btn danger" onclick="clearAll()">清空</button>
+    <label style="font-size:12px;color:#6b7280;margin-left:8px">缩进</label>
+    <select class="indent-select" id="indentSel">
+      <option value="2" selected>2 空格</option>
+      <option value="4">4 空格</option>
+      <option value="tab">Tab</option>
+    </select>
+  </div>
+
+  <div class="editors">
+    <div class="editor-wrap">
+      <label>输入 JSON <span id="inCount"></span></label>
+      <textarea class="json-ta" id="jsonIn" placeholder='{"name":"工具箱","version":1,"features":["格式化","压缩","校验"]}'
+        oninput="onInput()"></textarea>
+      <div class="status-bar" id="inStatus"></div>
+    </div>
+    <div class="editor-wrap">
+      <label>输出结果 <span id="outCount"></span></label>
+      <textarea class="json-ta" id="jsonOut" placeholder="格式化结果将显示在这里..." readonly></textarea>
+      <div class="status-bar" id="outStatus"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const inEl  = document.getElementById('jsonIn');
+const outEl = document.getElementById('jsonOut');
+
+function getIndent() {
+  const v = document.getElementById('indentSel').value;
+  return v === 'tab' ? '\t' : +v;
+}
+
+function validate(src) {
+  try { JSON.parse(src); return null; }
+  catch(e) { return e.message; }
+}
+
+function onInput() {
+  const s = inEl.value.trim();
+  const inCount = document.getElementById('inCount');
+  inCount.textContent = s ? `${s.length} 字符` : '';
+  if (!s) { inEl.className = 'json-ta'; document.getElementById('inStatus').innerHTML = ''; return; }
+  const err = validate(s);
+  if (err) { inEl.className = 'json-ta err'; document.getElementById('inStatus').innerHTML = `<span class="status-err">✕ ${err}</span>`; }
+  else { inEl.className = 'json-ta ok'; document.getElementById('inStatus').innerHTML = '<span class="status-ok">✓ 有效 JSON</span>'; }
+}
+
+function formatJSON() {
+  const s = inEl.value.trim();
+  if (!s) return;
+  try {
+    const obj = JSON.parse(s);
+    outEl.value = JSON.stringify(obj, null, getIndent());
+    outEl.className = 'json-ta ok';
+    document.getElementById('outStatus').innerHTML = '<span class="status-ok">✓ 格式化完成</span>';
+    document.getElementById('outCount').textContent = `${outEl.value.length} 字符`;
+  } catch(e) {
+    outEl.value = '解析错误：' + e.message; outEl.className = 'json-ta err';
+    document.getElementById('outStatus').innerHTML = `<span class="status-err">✕ ${e.message}</span>`;
+  }
+}
+
+function minifyJSON() {
+  const s = inEl.value.trim();
+  if (!s) return;
+  try {
+    outEl.value = JSON.stringify(JSON.parse(s));
+    outEl.className = 'json-ta ok';
+    document.getElementById('outStatus').innerHTML = `<span class="status-ok">✓ 压缩完成（${outEl.value.length} 字符）</span>`;
+    document.getElementById('outCount').textContent = `${outEl.value.length} 字符`;
+  } catch(e) { outEl.value = '解析错误：' + e.message; outEl.className = 'json-ta err'; }
+}
+
+function sortKeys() {
+  const s = inEl.value.trim();
+  if (!s) return;
+  try {
+    function sortObj(v) {
+      if (Array.isArray(v)) return v.map(sortObj);
+      if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map(k => [k, sortObj(v[k])]));
+      return v;
+    }
+    outEl.value = JSON.stringify(sortObj(JSON.parse(s)), null, getIndent());
+    outEl.className = 'json-ta ok';
+    document.getElementById('outStatus').innerHTML = '<span class="status-ok">✓ Key 已排序</span>';
+    document.getElementById('outCount').textContent = `${outEl.value.length} 字符`;
+  } catch(e) { outEl.value = '解析错误：' + e.message; outEl.className = 'json-ta err'; }
+}
+
+function copyOutput() {
+  if (!outEl.value) return;
+  navigator.clipboard.writeText(outEl.value);
+  const btn = document.querySelector('.tb-btn:nth-child(4)');
+  const orig = btn.textContent; btn.textContent = '✓ 已复制';
+  setTimeout(() => btn.textContent = orig, 1500);
+}
+
+function clearAll() {
+  inEl.value = ''; outEl.value = '';
+  inEl.className = outEl.className = 'json-ta';
+  ['inStatus','outStatus','inCount','outCount'].forEach(id => document.getElementById(id).textContent = '');
+}
+</script>
+</body>
+</html>

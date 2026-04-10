@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF 合并 - PDF 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .add-more { display: none; margin-top: 10px; }
+    .add-more.show { display: block; }
+    .add-more-btn {
+      width: 100%; padding: 9px; border: 1.5px dashed #c4b5fd;
+      border-radius: 9px; background: #faf5ff; color: #6366f1;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+      position: relative;
+    }
+    .add-more-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .add-more-btn:hover { background: #f5f3ff; border-color: #6366f1; }
+    .hint { font-size: 12px; color: #9ca3af; text-align: center; margin-top: 8px; }
+
+    .size-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+      margin-bottom: 6px;
+    }
+    .size-btn {
+      padding: 7px 4px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+      background: #fff; cursor: pointer; text-align: center; transition: all 0.15s;
+      font-size: 12px; font-weight: 600; color: #374151;
+    }
+    .size-btn:hover { border-color: #6366f1; background: #f5f3ff; color: #4f46e5; }
+    .size-btn.active { border-color: #6366f1; background: #ede9fe; color: #4f46e5; }
+    .size-hint { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">📦 PDF 工具箱</a>
+  <div class="nav-links">
+    <a href="/pdf_compress.html">🗜️ 压缩</a>
+    <a href="/pdf_merge.html" class="active">🔗 合并</a>
+    <a href="/pdf_split.html">✂️ 拆分</a>
+    <a href="/img_to_pdf.html">🖼️ 图转PDF</a>
+    <a href="/pdf_to_img.html">📸 PDF转图</a>
+  </div>
+</nav>
+
+<div class="page">
+<div class="card">
+  <h1>PDF 合并</h1>
+  <p class="subtitle">上传多个 PDF 文件，拖拽调整顺序，合并为一个文件</p>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".pdf,application/pdf" multiple>
+    <div class="drop-icon">🔗</div>
+    <div class="drop-text">点击选择或拖拽 PDF 文件</div>
+    <div class="drop-hint">可同时选择多个文件 · 最大单文件 200 MB</div>
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+  <p class="hint" id="dragHint" style="display:none">拖拽文件名可调整合并顺序</p>
+
+  <div class="add-more" id="addMoreArea">
+    <button class="add-more-btn">
+      <input type="file" id="addMoreInput" accept=".pdf,application/pdf" multiple>
+      ＋ 继续添加 PDF
+    </button>
+  </div>
+
+  <div class="section" id="sizeSection" style="display:none">
+    <div class="section-title">统一页面尺寸</div>
+    <div class="size-grid" id="sizeGrid">
+      <button class="size-btn active" data-size="original">保持原始</button>
+      <button class="size-btn" data-size="a5">A5</button>
+      <button class="size-btn" data-size="a4">A4</button>
+      <button class="size-btn" data-size="a3">A3</button>
+      <button class="size-btn" data-size="a2">A2</button>
+      <button class="size-btn" data-size="a1">A1</button>
+      <button class="size-btn" data-size="letter">Letter</button>
+      <button class="size-btn" data-size="legal">Legal</button>
+    </div>
+    <p class="size-hint">选择统一尺寸后，所有页面将等比缩放并居中，自动识别横向/纵向</p>
+  </div>
+
+  <button class="btn btn-primary" id="mergeBtn" disabled>请先添加至少两个 PDF</button>
+
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-text" id="progressText">正在合并...</div>
+  </div>
+
+  <div class="result" id="result"></div>
+</div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(2) + ' MB';
+
+let files = []; // { file, id }
+let dragSrc = null;
+let selectedSize = 'original';
+let _dlFile = null;
+
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedSize = btn.dataset.size;
+  });
+});
+
+function uid() { return Math.random().toString(36).slice(2); }
+
+function addFiles(newFiles) {
+  for (const f of newFiles) {
+    if (f.type !== 'application/pdf') { alert(`${f.name} 不是 PDF 文件，已跳过`); continue; }
+    files.push({ file: f, id: uid() });
+  }
+  render();
+}
+
+function removeFile(id) {
+  files = files.filter(f => f.id !== id);
+  render();
+}
+
+function render() {
+  const list = $('fileList');
+  list.innerHTML = '';
+  files.forEach(({ file, id }) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.draggable = true;
+    item.dataset.id = id;
+    item.innerHTML = `
+      <span class="drag-handle">⠿</span>
+      <span class="fi-icon">📄</span>
+      <div class="fi-details">
+        <div class="fi-name">${file.name}</div>
+        <div class="fi-meta">${fmtSize(file.size)}</div>
+      </div>
+      <button class="fi-remove" data-id="${id}">✕</button>`;
+
+    item.addEventListener('dragstart', e => { dragSrc = id; item.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    item.addEventListener('dragend',   () => { dragSrc = null; item.classList.remove('dragging'); document.querySelectorAll('.file-item').forEach(el => el.classList.remove('drag-target')); });
+    item.addEventListener('dragover',  e => { e.preventDefault(); if (dragSrc !== id) item.classList.add('drag-target'); });
+    item.addEventListener('dragleave', () => item.classList.remove('drag-target'));
+    item.addEventListener('drop', e => {
+      e.preventDefault(); item.classList.remove('drag-target');
+      if (!dragSrc || dragSrc === id) return;
+      const srcIdx = files.findIndex(f => f.id === dragSrc);
+      const dstIdx = files.findIndex(f => f.id === id);
+      const [moved] = files.splice(srcIdx, 1);
+      files.splice(dstIdx, 0, moved);
+      render();
+    });
+    item.querySelector('.fi-remove').addEventListener('click', () => removeFile(id));
+    list.appendChild(item);
+  });
+
+  const hasFiles = files.length > 0;
+  $('dragHint').style.display = files.length > 1 ? 'block' : 'none';
+  $('addMoreArea').className = 'add-more' + (hasFiles ? ' show' : '');
+  $('sizeSection').style.display = hasFiles ? 'block' : 'none';
+  $('mergeBtn').disabled = files.length < 2;
+  $('mergeBtn').textContent = files.length >= 2 ? `合并 ${files.length} 个 PDF` : '请先添加至少两个 PDF';
+  $('result').classList.remove('show');
+}
+
+$('fileInput').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+$('addMoreInput').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+
+const dz = $('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); addFiles(e.dataTransfer.files); });
+
+function animateTo(target, ms) {
+  const start = parseFloat($('progressBar').style.width) || 0;
+  const t0 = Date.now();
+  (function step() {
+    const pct = Math.min(start + (target - start) * (Date.now() - t0) / ms, target);
+    $('progressBar').style.width = pct + '%';
+    if (pct < target) requestAnimationFrame(step);
+  })();
+}
+
+$('mergeBtn').addEventListener('click', async () => {
+  if (files.length < 2) return;
+  $('mergeBtn').disabled = true; $('mergeBtn').textContent = '合并中...';
+  $('result').classList.remove('show');
+  $('progressArea').classList.add('show'); $('progressBar').style.width = '0%';
+  $('progressText').textContent = '正在上传...';
+  animateTo(30, 600);
+
+  const fd = new FormData();
+  files.forEach(({ file }) => fd.append('pdfs', file));
+  fd.append('order', JSON.stringify(files.map((_, i) => i)));
+  fd.append('paperSize', selectedSize);
+
+  try {
+    $('progressText').textContent = '正在合并页面...';
+    animateTo(85, 1500);
+    const data = await fetch('/api/merge', { method: 'POST', body: fd }).then(r => r.json());
+    $('progressBar').style.width = '100%'; $('progressText').textContent = '完成';
+    setTimeout(() => { $('progressArea').classList.remove('show'); showResult(data); }, 350);
+  } catch { $('progressArea').classList.remove('show'); showError('网络错误，请重试'); }
+  finally { $('mergeBtn').disabled = false; $('mergeBtn').textContent = `合并 ${files.length} 个 PDF`; }
+});
+
+function showResult(data) {
+  const r = $('result'); r.classList.add('show');
+  if (!data.success) { r.innerHTML = failHtml(data.error); return; }
+  const sizeLabel = selectedSize === 'original' ? '原始尺寸' : selectedSize.toUpperCase();
+  _dlFile = data.file;
+  r.innerHTML = `
+    <div class="result-header ok"><span class="result-icon">✅</span><span class="result-title">合并成功！</span></div>
+    <div class="result-body">
+      <div class="stats">
+        <div class="stat-box"><div class="stat-value">${files.length}</div><div class="stat-label">合并文件数</div></div>
+        <div class="stat-box"><div class="stat-value green">${data.pageCount}</div><div class="stat-label">总页数</div></div>
+        <div class="stat-box"><div class="stat-value">${fmtSize(data.size)}</div><div class="stat-label">文件大小</div></div>
+      </div>
+      <div class="info-row">页面尺寸：<strong>${sizeLabel}</strong></div>
+      <button class="btn btn-success" onclick="downloadFile(_dlFile)">⬇ 下载合并文件</button>
+    </div>`;
+}
+function showError(msg) { $('result').classList.add('show'); $('result').innerHTML = failHtml(msg); }
+function failHtml(msg) {
+  return `<div class="result-header fail"><span class="result-icon">❌</span><span class="result-title">失败</span></div><div class="result-body"><p class="error-msg">${msg}</p></div>`;
+}
+
+setupPaste(t => t === 'application/pdf', f => addFiles([f]));
+</script>
+</body>
+</html>

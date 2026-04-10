@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>二维码工具 - 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .tabs { display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 24px; }
+    .tab-btn { padding: 10px 20px; border: none; background: none; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+    .tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
+    .tab-panel { display: none; } .tab-panel.active { display: block; }
+
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .form-group { flex: 1; min-width: 140px; }
+    .form-label { font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 5px; display: block; }
+    select, .form-input {
+      width: 100%; padding: 8px 10px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+      font-size: 13px; outline: none; transition: border-color 0.15s; background: #fff;
+    }
+    select:focus, .form-input:focus { border-color: #6366f1; }
+    textarea.form-input { resize: vertical; min-height: 90px; font-family: inherit; }
+
+    .qr-preview { text-align: center; margin: 16px 0; }
+    .qr-preview img { max-width: 240px; border-radius: 10px; border: 1px solid #e5e7eb; }
+    .qr-placeholder { width: 200px; height: 200px; background: #f3f4f6; border-radius: 10px; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 36px; }
+
+    .color-row { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; }
+    .color-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; }
+    input[type="color"] { width: 36px; height: 28px; border: 1.5px solid #e5e7eb; border-radius: 6px; cursor: pointer; padding: 1px; }
+
+    .decoded-content {
+      background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 9px;
+      padding: 14px; font-size: 14px; word-break: break-all; min-height: 60px;
+      white-space: pre-wrap;
+    }
+    .decoded-content.ok  { border-color: #6ee7b7; background: #ecfdf5; color: #065f46; }
+    .decoded-content.err { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+    .copy-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+    .copy-btn { font-size: 12px; padding: 5px 12px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">🧰 工具箱</a>
+  <span style="font-size:13px;color:#6b7280;font-weight:600">🔲 二维码工具</span>
+</nav>
+
+<div class="page">
+<div class="card">
+  <h1>二维码工具</h1>
+  <p class="subtitle">生成二维码图片 / 上传图片识别内容</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="gen">生成二维码</button>
+    <button class="tab-btn" data-tab="dec">识别二维码</button>
+  </div>
+
+  <!-- 生成 -->
+  <div class="tab-panel active" id="tab-gen">
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">输入内容（文本、网址等）</label>
+      <textarea class="form-input" id="qrContent" placeholder="https://example.com 或任意文本..."></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">输出格式</label>
+        <select id="qrFormat">
+          <option value="png">PNG</option>
+          <option value="svg">SVG（矢量）</option>
+          <option value="jpg">JPEG</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">尺寸（px）</label>
+        <select id="qrSize">
+          <option value="200">200 px</option>
+          <option value="400" selected>400 px</option>
+          <option value="600">600 px</option>
+          <option value="800">800 px</option>
+          <option value="1200">1200 px</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">容错级别</label>
+        <select id="qrErrorLevel">
+          <option value="L">L — 7%</option>
+          <option value="M" selected>M — 15%</option>
+          <option value="Q">Q — 25%</option>
+          <option value="H">H — 30%</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="color-row">
+      <div class="color-item"><input type="color" id="qrDark" value="#000000"><span>前景色</span></div>
+      <div class="color-item"><input type="color" id="qrLight" value="#ffffff"><span>背景色</span></div>
+    </div>
+
+    <div class="qr-preview"><div class="qr-placeholder" id="qrPlaceholder">🔲</div><img id="qrImg" style="display:none"></div>
+
+    <button class="btn btn-primary" id="genBtn">生成二维码</button>
+
+    <div class="progress-area" id="genProgress">
+      <div class="progress-bar-wrap"><div class="progress-bar" id="genBar"></div></div>
+      <div class="progress-text">正在生成...</div>
+    </div>
+
+    <div id="genResult" style="display:none;margin-top:14px">
+      <a class="btn btn-success" id="genDownload" href="#">⬇ 下载二维码</a>
+    </div>
+  </div>
+
+  <!-- 识别 -->
+  <div class="tab-panel" id="tab-dec">
+    <div class="drop-zone" id="decDrop">
+      <input type="file" id="decInput" accept="image/*">
+      <div class="drop-icon">🔍</div>
+      <div class="drop-text">点击选择或拖拽二维码图片</div>
+      <div class="drop-hint">支持 JPG、PNG、WebP 等常见格式</div>
+    </div>
+
+    <button class="btn btn-primary" id="decBtn" disabled style="margin-top:14px">上传图片后识别</button>
+
+    <div class="progress-area" id="decProgress">
+      <div class="progress-bar-wrap"><div class="progress-bar" id="decBar"></div></div>
+      <div class="progress-text">正在识别...</div>
+    </div>
+
+    <div id="decResult" style="display:none;margin-top:16px">
+      <label class="form-label">识别内容</label>
+      <div class="decoded-content" id="decContent"></div>
+      <div class="copy-row"><button class="btn btn-gray copy-btn" id="decCopy">复制</button></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+
+// tabs
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── 生成 ──
+$('genBtn').addEventListener('click', async () => {
+  const content = $('qrContent').value.trim();
+  if (!content) { alert('请输入内容'); return; }
+
+  $('genBtn').disabled = true; $('genBtn').textContent = '生成中...';
+  $('genProgress').classList.add('show'); $('genBar').style.width = '0%';
+  $('genResult').style.display = 'none';
+  setTimeout(() => { $('genBar').style.width = '80%'; }, 50);
+
+  try {
+    const res = await fetch('/api/qrcode/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content,
+        format: $('qrFormat').value,
+        size: +$('qrSize').value,
+        errorLevel: $('qrErrorLevel').value,
+        dark: $('qrDark').value,
+        light: $('qrLight').value,
+      })
+    }).then(r => r.json());
+
+    $('genBar').style.width = '100%';
+    setTimeout(() => $('genProgress').classList.remove('show'), 300);
+
+    if (!res.success) { alert(res.error); return; }
+
+    $('qrPlaceholder').style.display = 'none';
+    $('qrImg').src = res.preview; $('qrImg').style.display = 'inline-block';
+    $('genDownload').onclick = (e) => { e.preventDefault(); downloadFile(res.file); };
+    $('genResult').style.display = 'block';
+  } catch { alert('网络错误，请重试'); $('genProgress').classList.remove('show'); }
+  finally { $('genBtn').disabled = false; $('genBtn').textContent = '生成二维码'; }
+});
+
+// ── 识别 ──
+let decFile = null;
+$('decInput').addEventListener('change', e => { if (e.target.files[0]) setDecFile(e.target.files[0]); });
+const dd = $('decDrop');
+dd.addEventListener('dragover', e => { e.preventDefault(); dd.classList.add('drag-over'); });
+dd.addEventListener('dragleave', () => dd.classList.remove('drag-over'));
+dd.addEventListener('drop', e => { e.preventDefault(); dd.classList.remove('drag-over'); if (e.dataTransfer.files[0]) setDecFile(e.dataTransfer.files[0]); });
+
+function setDecFile(f) {
+  decFile = f;
+  dd.querySelector('.drop-text').textContent = f.name;
+  $('decBtn').disabled = false; $('decBtn').textContent = '开始识别';
+  $('decResult').style.display = 'none';
+}
+
+$('decBtn').addEventListener('click', async () => {
+  if (!decFile) return;
+  $('decBtn').disabled = true; $('decBtn').textContent = '识别中...';
+  $('decProgress').classList.add('show'); $('decBar').style.width = '0%';
+  setTimeout(() => { $('decBar').style.width = '80%'; }, 50);
+
+  const fd = new FormData(); fd.append('image', decFile);
+  try {
+    const res = await fetch('/api/qrcode/decode', { method: 'POST', body: fd }).then(r => r.json());
+    $('decBar').style.width = '100%';
+    setTimeout(() => $('decProgress').classList.remove('show'), 300);
+
+    const el = $('decContent');
+    if (res.success) {
+      el.textContent = res.content; el.className = 'decoded-content ok';
+      $('decCopy').onclick = () => { navigator.clipboard.writeText(res.content); $('decCopy').textContent = '已复制'; setTimeout(() => $('decCopy').textContent = '复制', 1500); };
+    } else {
+      el.textContent = res.error; el.className = 'decoded-content err';
+    }
+    $('decResult').style.display = 'block';
+  } catch { alert('网络错误，请重试'); $('decProgress').classList.remove('show'); }
+  finally { $('decBtn').disabled = false; $('decBtn').textContent = '开始识别'; }
+});
+
+setupPaste(t => t.startsWith('image/'), f => {
+  document.querySelector('[data-tab="dec"]').click();
+  setDecFile(f);
+});
+</script>
+</body>
+</html>
