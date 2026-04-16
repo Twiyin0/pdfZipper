@@ -12,7 +12,7 @@ import Diff from 'diff'
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js')
-pdfjsLib.GlobalWorkerOptions.workerSrc = false
+pdfjsLib.GlobalWorkerOptions.workerSrc = null
 
 const app = express()
 app.use(express.json({ limit: '50mb' }))

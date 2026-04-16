@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "PDF 工具箱",
   "packageManager": "yarn@4.6.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "concurrently -k -n server,client -c cyan,green \"yarn dev:server\" \"yarn dev:client\"",
     "dev:server": "tsx watch server.ts",
