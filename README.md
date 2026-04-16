@@ -11,9 +11,12 @@
 ### PDF 工具
 | 工具 | 说明 |
 |------|------|
-| PDF 压缩 | DPI 重渲染 + 对象流双策略，自动选择最优结果 |
+| PDF 压缩 | DPI 重渲染（并行）+ 对象流双策略，自动选择最优结果 |
 | PDF 合并 | 拖拽排序，支持 A1–A5 / Letter / Legal 统一纸张 |
 | PDF 拆分 | 每页单独导出或自定义范围，打包 ZIP 下载 |
+| PDF 旋转 | 顺时针/逆时针/180°，支持旋转全部或指定页面 |
+| 页面管理 | 删除指定页面 / 提取指定页面为新 PDF，支持范围格式 |
+| PDF 比对 | 逐页对比两个 PDF 的文字内容，双栏高亮显示新增/删除差异 |
 | 图片转 PDF | 最多 50 张图片，拖拽排序后合成 PDF |
 | PDF 转图片 | 每页渲染为 JPG，多页自动打包 ZIP |
 
@@ -44,7 +47,7 @@
 - **运行时：** Node.js 20 + Express 5
 - **PDF 处理：** pdf-lib · pdfjs-dist@2.16.105
 - **图片处理：** sharp · canvas
-- **其他：** qrcode · jsqr · archiver · multer
+- **其他：** qrcode · jsqr · archiver · multer · diff
 - **部署：** Vercel（Serverless Functions + CDN 静态托管）
 
 ---
@@ -80,6 +83,18 @@ pdfZipper/
 ├── api/
 │   └── index.js       # Express 应用（Vercel Serverless 入口）
 ├── public/            # 静态前端页面
+│   ├── style.css
+│   ├── common.js
+│   ├── index.html
+│   ├── pdf_compress.html
+│   ├── pdf_merge.html
+│   ├── pdf_split.html
+│   ├── pdf_rotate.html
+│   ├── pdf_pages.html
+│   ├── pdf_compare.html
+│   ├── img_to_pdf.html
+│   ├── pdf_to_img.html
+│   └── ...
 ├── server.js          # 本地开发入口（监听 3013 端口）
 ├── vercel.json        # Vercel 部署配置
 └── package.json

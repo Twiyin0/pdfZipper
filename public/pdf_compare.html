@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF 比对 - PDF 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .upload-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .upload-slot {
+      border: 2px dashed #d1d5db;
+      border-radius: 12px;
+      padding: 20px 12px;
+      text-align: center;
+      cursor: pointer;
+      background: #fafafa;
+      position: relative;
+      transition: border-color 0.2s, background 0.2s;
+      min-height: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .upload-slot:hover, .upload-slot.drag-over { border-color: #6366f1; background: #f5f3ff; }
+    .upload-slot input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-slot .slot-icon { font-size: 28px; margin-bottom: 6px; }
+    .upload-slot .slot-label { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .upload-slot .slot-name { font-size: 12px; font-weight: 600; color: #374151; word-break: break-all; }
+    .upload-slot .slot-size { font-size: 11px; color: #9ca3af; }
+    .upload-slot.has-file { border-color: #a5b4fc; background: #f5f3ff; }
+    .upload-slot.has-file .slot-icon { font-size: 22px; }
+    .slot-remove {
+      position: absolute; top: 6px; right: 8px;
+      background: none; border: none; cursor: pointer;
+      font-size: 14px; color: #9ca3af; line-height: 1;
+      display: none;
+    }
+    .upload-slot.has-file .slot-remove { display: block; }
+
+    /* 结果区 */
+    .compare-summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .summary-box {
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 10px; padding: 12px 8px; text-align: center;
+    }
+    .summary-val { font-size: 22px; font-weight: 800; color: #1f2937; }
+    .summary-val.green { color: #059669; }
+    .summary-val.red   { color: #dc2626; }
+    .summary-val.blue  { color: #6366f1; }
+    .summary-lbl { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+    .page-tabs {
+      display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .page-tab {
+      padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid #e5e7eb; background: #fff;
+      transition: all 0.15s; color: #6b7280;
+    }
+    .page-tab:hover { border-color: #6366f1; color: #4f46e5; }
+    .page-tab.active { border-color: #6366f1; background: #ede9fe; color: #4f46e5; }
+    .page-tab.changed { border-color: #fca5a5; background: #fff; color: #dc2626; }
+    .page-tab.changed.active { background: #fee2e2; }
+    .page-tab.identical { color: #9ca3af; }
+
+    .diff-view {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .diff-col {
+      padding: 14px 16px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 120px;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+    .diff-col-a { background: #fafafa; border-right: 1px solid #e5e7eb; }
+    .diff-col-b { background: #fafafa; }
+    .diff-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid #e5e7eb;
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+      overflow: hidden;
+    }
+    .diff-header-cell {
+      padding: 8px 16px; font-size: 12px; font-weight: 700;
+      color: #6b7280; background: #f3f4f6;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .diff-header-cell:first-child { border-right: 1px solid #e5e7eb; }
+
+    .diff-removed { background: #fee2e2; color: #991b1b; border-radius: 2px; }
+    .diff-added   { background: #dcfce7; color: #166534; border-radius: 2px; }
+
+    .identical-badge {
+      text-align: center; padding: 24px; color: #9ca3af;
+      font-size: 13px; background: #f9fafb;
+      border: 1px solid #e5e7eb; border-radius: 10px;
+    }
+
+    .filter-row {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid #e5e7eb; background: #fff;
+      transition: all 0.15s; color: #6b7280;
+    }
+    .filter-btn.active { border-color: #6366f1; background: #ede9fe; color: #4f46e5; }
+    .filter-label { font-size: 12px; color: #9ca3af; }
+
+    @media (max-width: 600px) {
+      .upload-pair { grid-template-columns: 1fr; }
+      .compare-summary { grid-template-columns: repeat(2, 1fr); }
+      .diff-view, .diff-header { grid-template-columns: 1fr; }
+      .diff-col-a { border-right: none; border-bottom: 1px solid #e5e7eb; }
+      .diff-header-cell:first-child { border-right: none; border-bottom: 1px solid #e5e7eb; }
+    }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">📦 PDF 工具箱</a>
+  <div class="nav-links">
+    <a href="/pdf_compress.html">🗜️ 压缩</a>
+    <a href="/pdf_merge.html">🔗 合并</a>
+    <a href="/pdf_split.html">✂️ 拆分</a>
+    <a href="/pdf_rotate.html">🔄 旋转</a>
+    <a href="/pdf_pages.html">📑 页面管理</a>
+    <a href="/pdf_compare.html" class="active">🔍 比对</a>
+    <a href="/img_to_pdf.html">🖼️ 图转PDF</a>
+    <a href="/pdf_to_img.html">📸 PDF转图</a>
+  </div>
+</nav>
+
+<div class="page">
+<div class="card card-wide">
+  <h1>PDF 比对</h1>
+  <p class="subtitle">逐页对比两个 PDF 的文字内容，高亮显示新增、删除和修改的部分</p>
+
+  <div class="upload-pair">
+    <div class="upload-slot" id="slotA">
+      <input type="file" id="fileA" accept=".pdf,application/pdf">
+      <button class="slot-remove" id="removeA" onclick="clearSlot('A')">✕</button>
+      <div class="slot-icon" id="iconA">📄</div>
+      <div class="slot-label">文件 A（原始）</div>
+      <div class="slot-name" id="nameA">点击或拖拽上传</div>
+      <div class="slot-size" id="sizeA"></div>
+    </div>
+    <div class="upload-slot" id="slotB">
+      <input type="file" id="fileB" accept=".pdf,application/pdf">
+      <button class="slot-remove" id="removeB" onclick="clearSlot('B')">✕</button>
+      <div class="slot-icon" id="iconB">📄</div>
+      <div class="slot-label">文件 B（修改后）</div>
+      <div class="slot-name" id="nameB">点击或拖拽上传</div>
+      <div class="slot-size" id="sizeB"></div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="compareBtn" disabled>请先上传两个 PDF</button>
+
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-text" id="progressText">正在提取文字...</div>
+  </div>
+
+  <div id="compareResult" style="display:none">
+    <div class="compare-summary" id="summary"></div>
+
+    <div class="filter-row">
+      <span class="filter-label">显示：</span>
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">全部页面</button>
+      <button class="filter-btn" data-filter="changed" onclick="setFilter('changed')">仅差异页</button>
+      <button class="filter-btn" data-filter="identical" onclick="setFilter('identical')">仅相同页</button>
+    </div>
+
+    <div class="page-tabs" id="pageTabs"></div>
+
+    <div id="diffArea"></div>
+  </div>
+</div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fmtSize = b => b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(2) + ' MB';
+
+let fileA = null, fileB = null;
+let compareData = null;
+let currentPage = 1;
+let currentFilter = 'all';
+
+// ── 文件槽 ────────────────────────────────────────────────────────────────────
+function setSlot(which, file) {
+  if (!file || file.type !== 'application/pdf') { alert('请选择 PDF 文件'); return; }
+  if (which === 'A') fileA = file; else fileB = file;
+
+  const slot = $(`slot${which}`), icon = $(`icon${which}`);
+  const name = $(`name${which}`), size = $(`size${which}`);
+  slot.classList.add('has-file');
+  icon.textContent = '✅';
+  name.textContent = file.name;
+  size.textContent = fmtSize(file.size);
+  updateBtn();
+  $('compareResult').style.display = 'none';
+}
+
+function clearSlot(which) {
+  if (which === 'A') { fileA = null; $('fileA').value = ''; }
+  else               { fileB = null; $('fileB').value = ''; }
+  const slot = $(`slot${which}`), icon = $(`icon${which}`);
+  slot.classList.remove('has-file');
+  icon.textContent = '📄';
+  $(`name${which}`).textContent = '点击或拖拽上传';
+  $(`size${which}`).textContent = '';
+  updateBtn();
+}
+
+function updateBtn() {
+  const ready = fileA && fileB;
+  $('compareBtn').disabled = !ready;
+  $('compareBtn').textContent = ready ? '开始比对' : '请先上传两个 PDF';
+}
+
+['A','B'].forEach(w => {
+  $(`file${w}`).addEventListener('change', e => { if (e.target.files[0]) setSlot(w, e.target.files[0]); });
+  const slot = $(`slot${w}`);
+  slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('drag-over'); });
+  slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+  slot.addEventListener('drop', e => {
+    e.preventDefault(); slot.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) setSlot(w, e.dataTransfer.files[0]);
+  });
+});
+
+// ── 比对 ──────────────────────────────────────────────────────────────────────
+function animateTo(target, ms) {
+  const start = parseFloat($('progressBar').style.width) || 0;
+  const t0 = Date.now();
+  (function step() {
+    const pct = Math.min(start + (target - start) * (Date.now() - t0) / ms, target);
+    $('progressBar').style.width = pct + '%';
+    if (pct < target) requestAnimationFrame(step);
+  })();
+}
+
+$('compareBtn').addEventListener('click', async () => {
+  if (!fileA || !fileB) return;
+  $('compareBtn').disabled = true; $('compareBtn').textContent = '比对中...';
+  $('compareResult').style.display = 'none';
+  $('progressArea').classList.add('show'); $('progressBar').style.width = '0%';
+  $('progressText').textContent = '正在提取文字内容...';
+  animateTo(70, 2000);
+
+  const fd = new FormData();
+  fd.append('pdfs', fileA);
+  fd.append('pdfs', fileB);
+
+  try {
+    const data = await fetch('/api/compare', { method: 'POST', body: fd }).then(r => r.json());
+    $('progressBar').style.width = '100%'; $('progressText').textContent = '完成';
+    setTimeout(() => {
+      $('progressArea').classList.remove('show');
+      if (data.success) { compareData = data; renderResult(); }
+      else showError(data.error);
+    }, 300);
+  } catch { $('progressArea').classList.remove('show'); showError('网络错误，请重试'); }
+  finally { $('compareBtn').disabled = false; $('compareBtn').textContent = '重新比对'; }
+});
+
+// ── 渲染结果 ──────────────────────────────────────────────────────────────────
+function renderResult() {
+  const d = compareData;
+  $('compareResult').style.display = 'block';
+
+  // 摘要
+  $('summary').innerHTML = `
+    <div class="summary-box"><div class="summary-val blue">${d.totalPages}</div><div class="summary-lbl">总页数</div></div>
+    <div class="summary-box"><div class="summary-val red">${d.changedPages}</div><div class="summary-lbl">差异页</div></div>
+    <div class="summary-box"><div class="summary-val green">${d.identicalPages}</div><div class="summary-lbl">相同页</div></div>
+    <div class="summary-box"><div class="summary-val">${d.pagesA} / ${d.pagesB}</div><div class="summary-lbl">A页数 / B页数</div></div>`;
+
+  renderTabs();
+  showPage(1);
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
+  renderTabs();
+  // 跳到第一个可见页
+  const visible = visiblePages();
+  if (visible.length) showPage(visible[0].page);
+  else $('diffArea').innerHTML = '<div class="identical-badge">该筛选条件下无页面</div>';
+}
+
+function visiblePages() {
+  if (!compareData) return [];
+  return compareData.pages.filter(p => {
+    if (currentFilter === 'changed')   return !p.identical;
+    if (currentFilter === 'identical') return p.identical;
+    return true;
+  });
+}
+
+function renderTabs() {
+  const tabs = $('pageTabs');
+  const visible = visiblePages();
+  tabs.innerHTML = visible.map(p =>
+    `<button class="page-tab ${p.identical ? 'identical' : 'changed'} ${p.page === currentPage ? 'active' : ''}"
+      onclick="showPage(${p.page})">第 ${p.page} 页${p.identical ? '' : ' ●'}</button>`
+  ).join('');
+}
+
+function showPage(pageNum) {
+  currentPage = pageNum;
+  renderTabs();
+
+  const d = compareData;
+  const pageData = d.pages.find(p => p.page === pageNum);
+  if (!pageData) return;
+
+  if (pageData.identical) {
+    $('diffArea').innerHTML = `<div class="identical-badge">✅ 第 ${pageNum} 页内容完全相同</div>`;
+    return;
+  }
+
+  // 构建左右两列 HTML
+  let htmlA = '', htmlB = '';
+  for (const c of pageData.changes) {
+    const escaped = escapeHtml(c.value);
+    if (c.type === 'equal') {
+      htmlA += escaped;
+      htmlB += escaped;
+    } else if (c.type === 'removed') {
+      htmlA += `<mark class="diff-removed">${escaped}</mark>`;
+    } else if (c.type === 'added') {
+      htmlB += `<mark class="diff-added">${escaped}</mark>`;
+    }
+  }
+
+  const onlyA = pageData.onlyInA ? ' <span style="font-size:10px;color:#dc2626">（B中无此页）</span>' : '';
+  const onlyB = pageData.onlyInB ? ' <span style="font-size:10px;color:#059669">（A中无此页）</span>' : '';
+
+  $('diffArea').innerHTML = `
+    <div class="diff-header">
+      <div class="diff-header-cell">📄 ${escapeHtml(d.fileA)}${onlyA}</div>
+      <div class="diff-header-cell">📄 ${escapeHtml(d.fileB)}${onlyB}</div>
+    </div>
+    <div class="diff-view">
+      <div class="diff-col diff-col-a">${htmlA || '<span style="color:#9ca3af">（此页无内容）</span>'}</div>
+      <div class="diff-col diff-col-b">${htmlB || '<span style="color:#9ca3af">（此页无内容）</span>'}</div>
+    </div>`;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/\n/g,'<br>');
+}
+
+function showError(msg) {
+  $('compareResult').style.display = 'block';
+  $('summary').innerHTML = '';
+  $('pageTabs').innerHTML = '';
+  $('diffArea').innerHTML = `<div class="result-header fail" style="border-radius:10px;padding:14px 16px"><span class="result-icon">❌</span><span class="result-title">${msg}</span></div>`;
+}
+
+// 粘贴：第一次粘贴给 A，第二次给 B
+setupPaste(t => t === 'application/pdf', f => {
+  if (!fileA) setSlot('A', f);
+  else if (!fileB) setSlot('B', f);
+});
+</script>
+</body>
+</html>

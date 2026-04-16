@@ -2,10 +2,11 @@ node_modules/
 outputs/
 uploads/
 .env
-.claude
 .vercel
 package-lock.json
 yarn.lock
 .DS_Store
 .yarn
-
+example/
+.claude/settings.local.json
+.claude/projects/

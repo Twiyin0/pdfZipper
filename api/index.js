@@ -3,12 +3,13 @@ const multer   = require('multer');
 const path     = require('path');
 const crypto   = require('crypto');
 const archiver = require('archiver');
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, degrees } = require('pdf-lib');
 const { createCanvas, loadImage } = require('canvas');
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 const QRCode   = require('qrcode');
 const jsQR     = require('jsqr');
 const sharp    = require('sharp');
+const Diff     = require('diff');
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = false;
 
@@ -94,17 +95,26 @@ async function imageToEmbeddable(pdf, fileBuffer, mimeType) {
 // ── API: 压缩 ─────────────────────────────────────────────────────────────────
 async function compressByDPI(buf, dpi, jpegQuality) {
   const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise;
-  const outPdf = await PDFDocument.create();
-  const cf = new NodeCanvasFactory();
+  const total = pdfDoc.numPages;
   const scale = dpi / 72;
-  for (let n = 1; n <= pdfDoc.numPages; n++) {
-    const page = await pdfDoc.getPage(n);
-    const vp = page.getViewport({ scale });
-    const w = Math.floor(vp.width), h = Math.floor(vp.height);
-    const pair = cf.create(w, h);
-    await page.render({ canvasContext: pair.context, viewport: vp, canvasFactory: cf }).promise;
-    const jpg = pair.canvas.toBuffer('image/jpeg', { quality: jpegQuality });
-    cf.destroy(pair);
+
+  // 并行渲染所有页面
+  const cf = new NodeCanvasFactory();
+  const jpgs = await Promise.all(
+    Array.from({ length: total }, async (_, i) => {
+      const page = await pdfDoc.getPage(i + 1);
+      const vp = page.getViewport({ scale });
+      const w = Math.floor(vp.width), h = Math.floor(vp.height);
+      const pair = cf.create(w, h);
+      await page.render({ canvasContext: pair.context, viewport: vp, canvasFactory: cf }).promise;
+      const jpg = pair.canvas.toBuffer('image/jpeg', { quality: jpegQuality });
+      cf.destroy(pair);
+      return { jpg, w, h };
+    })
+  );
+
+  const outPdf = await PDFDocument.create();
+  for (const { jpg, w, h } of jpgs) {
     const img = await outPdf.embedJpg(jpg);
     const op = outPdf.addPage([w, h]);
     op.drawImage(img, { x: 0, y: 0, width: w, height: h });
@@ -406,6 +416,190 @@ app.post('/api/img-convert', imgUpload.single('image'), async (req, res) => {
       success: true, ext,
       originalSize: req.file.size, convertedSize: outBuf.length,
       file: b64File(outBuf, mimeMap[ext], `${baseName}.${ext}`),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── API: PDF 页面旋转 ─────────────────────────────────────────────────────────
+app.post('/api/rotate', pdfUpload.single('pdf'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '请上传 PDF 文件' });
+  try {
+    const angle = parseInt(req.body.angle) || 90;
+    if (![90, 180, 270, -90, -180, -270].includes(angle))
+      return res.status(400).json({ error: '旋转角度必须是 90 的倍数' });
+
+    const pageNums = req.body.pages; // 可选，逗号分隔的 1-based 页码，不传则旋转全部
+    const doc = await PDFDocument.load(req.file.buffer);
+    const total = doc.getPageCount();
+
+    let targetIndices;
+    if (pageNums) {
+      const segs = parseRanges(pageNums, total);
+      const set = new Set();
+      for (const [s, e] of segs) for (let i = s; i <= e; i++) set.add(i);
+      targetIndices = set;
+    }
+
+    for (let i = 0; i < total; i++) {
+      if (targetIndices && !targetIndices.has(i)) continue;
+      const page = doc.getPage(i);
+      const current = page.getRotation().angle;
+      page.setRotation(degrees((current + angle + 360) % 360));
+    }
+
+    const buf = Buffer.from(await doc.save({ useObjectStreams: true }));
+    const baseName = origName(req.file).replace(/\.pdf$/i, '');
+    res.json({
+      success: true, pageCount: total, size: buf.length,
+      file: b64File(buf, 'application/pdf', `${baseName}_rotated.pdf`),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── API: PDF 删除页面 ─────────────────────────────────────────────────────────
+app.post('/api/remove-pages', pdfUpload.single('pdf'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '请上传 PDF 文件' });
+  try {
+    const doc = await PDFDocument.load(req.file.buffer);
+    const total = doc.getPageCount();
+    const pages = req.body.pages;
+    if (!pages) return res.status(400).json({ error: '请指定要删除的页码' });
+
+    const toRemove = new Set(
+      pages.split(',').map(s => parseInt(s.trim()) - 1).filter(i => i >= 0 && i < total)
+    );
+    if (toRemove.size === 0) return res.status(400).json({ error: '无有效页码' });
+    if (toRemove.size >= total) return res.status(400).json({ error: '不能删除全部页面' });
+
+    // 倒序删除避免索引偏移
+    for (let i = total - 1; i >= 0; i--) {
+      if (toRemove.has(i)) doc.removePage(i);
+    }
+
+    const buf = Buffer.from(await doc.save({ useObjectStreams: true }));
+    const baseName = origName(req.file).replace(/\.pdf$/i, '');
+    res.json({
+      success: true,
+      originalPages: total, remainingPages: doc.getPageCount(),
+      removedPages: toRemove.size, size: buf.length,
+      file: b64File(buf, 'application/pdf', `${baseName}_removed.pdf`),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── API: PDF 提取页面 ─────────────────────────────────────────────────────────
+app.post('/api/extract-pages', pdfUpload.single('pdf'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '请上传 PDF 文件' });
+  try {
+    const src = await PDFDocument.load(req.file.buffer);
+    const total = src.getPageCount();
+    const pages = req.body.pages;
+    if (!pages) return res.status(400).json({ error: '请指定要提取的页码' });
+
+    // 支持范围格式，如 "1-3, 5, 7-9"
+    const segments = parseRanges(pages, total);
+    if (!segments.length) return res.status(400).json({ error: '无有效页码范围' });
+
+    const indices = [];
+    for (const [s, e] of segments) {
+      for (let i = s; i <= e; i++) indices.push(i);
+    }
+    // 去重并排序
+    const uniqueIndices = [...new Set(indices)].sort((a, b) => a - b);
+
+    const dest = await PDFDocument.create();
+    const copied = await dest.copyPages(src, uniqueIndices);
+    copied.forEach(p => dest.addPage(p));
+
+    const buf = Buffer.from(await dest.save({ useObjectStreams: true }));
+    const baseName = origName(req.file).replace(/\.pdf$/i, '');
+    res.json({
+      success: true,
+      originalPages: total, extractedPages: dest.getPageCount(), size: buf.length,
+      file: b64File(buf, 'application/pdf', `${baseName}_extracted.pdf`),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── API: PDF 比对 ─────────────────────────────────────────────────────────────
+async function extractPdfTextByPage(buf) {
+  const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const content = await page.getTextContent();
+    // 保留换行结构：按 y 坐标分组，同行 item 用空格连接，不同行用换行
+    const lines = [];
+    let lastY = null;
+    for (const item of content.items) {
+      if (!item.str) continue;
+      const y = Math.round(item.transform[5]);
+      if (lastY !== null && Math.abs(y - lastY) > 2) lines.push('\n');
+      else if (lastY !== null) lines.push(' ');
+      lines.push(item.str);
+      lastY = y;
+    }
+    pages.push(lines.join('').trim());
+  }
+  return { pages, total: pdfDoc.numPages };
+}
+
+app.post('/api/compare', pdfUpload.array('pdfs', 2), async (req, res) => {
+  if (!req.files || req.files.length !== 2)
+    return res.status(400).json({ error: '请上传两个 PDF 文件' });
+  try {
+    const [a, b] = await Promise.all([
+      extractPdfTextByPage(req.files[0].buffer),
+      extractPdfTextByPage(req.files[1].buffer),
+    ]);
+
+    const maxPages = Math.max(a.total, b.total);
+    const pageResults = [];
+    let totalAdded = 0, totalRemoved = 0;
+
+    for (let i = 0; i < maxPages; i++) {
+      const textA = a.pages[i] || '';
+      const textB = b.pages[i] || '';
+
+      if (textA === textB) {
+        pageResults.push({ page: i + 1, identical: true, changes: [] });
+        continue;
+      }
+
+      const changes = Diff.diffWords(textA, textB);
+      let added = 0, removed = 0;
+      for (const c of changes) {
+        if (c.added)   added   += c.value.length;
+        if (c.removed) removed += c.value.length;
+      }
+      totalAdded   += added;
+      totalRemoved += removed;
+
+      pageResults.push({
+        page: i + 1,
+        identical: false,
+        onlyInA: !a.pages[i] ? false : !b.pages[i],
+        onlyInB: !b.pages[i] ? false : !a.pages[i],
+        changes: changes.map(c => ({
+          type: c.added ? 'added' : c.removed ? 'removed' : 'equal',
+          value: c.value,
+        })),
+      });
+    }
+
+    const changedPages = pageResults.filter(p => !p.identical).length;
+    res.json({
+      success: true,
+      fileA: origName(req.files[0]),
+      fileB: origName(req.files[1]),
+      totalPages: maxPages,
+      pagesA: a.total,
+      pagesB: b.total,
+      changedPages,
+      identicalPages: maxPages - changedPages,
+      totalAdded,
+      totalRemoved,
+      pages: pageResults,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

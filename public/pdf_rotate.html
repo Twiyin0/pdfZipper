@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF 旋转 - PDF 工具箱</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .angle-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .angle-btn {
+      padding: 10px 4px; border: 1.5px solid #e5e7eb; border-radius: 9px;
+      background: #fff; cursor: pointer; text-align: center; transition: all 0.15s;
+      font-size: 13px; font-weight: 600; color: #374151;
+    }
+    .angle-btn:hover { border-color: #6366f1; background: #f5f3ff; color: #4f46e5; }
+    .angle-btn.active { border-color: #6366f1; background: #ede9fe; color: #4f46e5; }
+    .angle-icon { font-size: 20px; display: block; margin-bottom: 3px; }
+
+    .scope-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .scope-tab {
+      flex: 1; padding: 8px 10px; border: 1.5px solid #e5e7eb; border-radius: 9px;
+      background: #fff; cursor: pointer; text-align: center; transition: all 0.15s;
+      font-size: 12px; font-weight: 600; color: #374151;
+    }
+    .scope-tab:hover { border-color: #6366f1; background: #f5f3ff; }
+    .scope-tab.active { border-color: #6366f1; background: #ede9fe; color: #4f46e5; }
+
+    .pages-input-area { display: none; }
+    .pages-input-area.show { display: block; }
+    .pages-input {
+      width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 9px;
+      font-size: 13px; outline: none; transition: border-color 0.15s;
+    }
+    .pages-input:focus { border-color: #6366f1; }
+    .pages-hint { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/" class="logo">📦 PDF 工具箱</a>
+  <div class="nav-links">
+    <a href="/pdf_compress.html">🗜️ 压缩</a>
+    <a href="/pdf_merge.html">🔗 合并</a>
+    <a href="/pdf_split.html">✂️ 拆分</a>
+    <a href="/pdf_rotate.html" class="active">🔄 旋转</a>
+    <a href="/pdf_pages.html">📑 页面管理</a>
+    <a href="/pdf_compare.html">🔍 比对</a>
+    <a href="/img_to_pdf.html">🖼️ 图转PDF</a>
+    <a href="/pdf_to_img.html">📸 PDF转图</a>
+  </div>
+</nav>
+
+<div class="page">
+<div class="card">
+  <h1>PDF 旋转</h1>
+  <p class="subtitle">旋转 PDF 页面方向，支持旋转全部或指定页面</p>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".pdf,application/pdf">
+    <div class="drop-icon">🔄</div>
+    <div class="drop-text">点击选择或拖拽 PDF 文件</div>
+    <div class="drop-hint">最大支持 200 MB</div>
+  </div>
+
+  <div class="file-list" id="fileInfo" style="display:none">
+    <div class="file-item" style="cursor:default">
+      <span class="fi-icon">📄</span>
+      <div class="fi-details">
+        <div class="fi-name" id="fileName"></div>
+        <div class="fi-meta" id="fileSize"></div>
+      </div>
+      <button class="fi-remove" id="removeBtn">✕</button>
+    </div>
+  </div>
+
+  <div class="section" id="options" style="display:none">
+    <div class="section-title">旋转角度</div>
+    <div class="angle-grid" id="angleGrid">
+      <button class="angle-btn active" data-angle="90"><span class="angle-icon">↻</span>顺时针 90°</button>
+      <button class="angle-btn" data-angle="180"><span class="angle-icon">↕</span>旋转 180°</button>
+      <button class="angle-btn" data-angle="270"><span class="angle-icon">↺</span>逆时针 90°</button>
+    </div>
+
+    <div class="section-title" style="margin-top:14px">旋转范围</div>
+    <div class="scope-tabs">
+      <div class="scope-tab active" data-scope="all">全部页面</div>
+      <div class="scope-tab" data-scope="custom">指定页面</div>
+    </div>
+    <div class="pages-input-area" id="pagesInputArea">
+      <input type="text" class="pages-input" id="pagesInput" placeholder="例如：1, 3, 5-8">
+      <p class="pages-hint">用逗号分隔，支持范围（如 5-8）和单页（如 3）</p>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="rotateBtn" disabled>选择文件后开始旋转</button>
+
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-text" id="progressText">正在处理...</div>
+  </div>
+
+  <div class="result" id="result"></div>
+</div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fmtSize = b => b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(2) + ' MB';
+
+let selectedFile = null;
+let selectedAngle = 90;
+let scope = 'all';
+let _dlFile = null;
+
+document.querySelectorAll('.angle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.angle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedAngle = parseInt(btn.dataset.angle);
+  });
+});
+
+document.querySelectorAll('.scope-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.scope-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    scope = tab.dataset.scope;
+    $('pagesInputArea').className = 'pages-input-area' + (scope === 'custom' ? ' show' : '');
+  });
+});
+
+function selectFile(file) {
+  if (!file || file.type !== 'application/pdf') { alert('请选择 PDF 文件'); return; }
+  selectedFile = file;
+  $('fileName').textContent = file.name;
+  $('fileSize').textContent = fmtSize(file.size);
+  $('fileInfo').style.display = 'flex';
+  $('options').style.display = 'block';
+  $('rotateBtn').disabled = false;
+  $('rotateBtn').textContent = '开始旋转';
+  $('result').classList.remove('show');
+}
+
+function clearFile() {
+  selectedFile = null; $('fileInput').value = '';
+  $('fileInfo').style.display = 'none';
+  $('options').style.display = 'none';
+  $('rotateBtn').disabled = true;
+  $('rotateBtn').textContent = '选择文件后开始旋转';
+  $('result').classList.remove('show');
+}
+
+$('fileInput').addEventListener('change', e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
+$('removeBtn').addEventListener('click', clearFile);
+const dz = $('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]); });
+
+function animateTo(target, ms) {
+  const start = parseFloat($('progressBar').style.width) || 0;
+  const t0 = Date.now();
+  (function step() {
+    const pct = Math.min(start + (target - start) * (Date.now() - t0) / ms, target);
+    $('progressBar').style.width = pct + '%';
+    if (pct < target) requestAnimationFrame(step);
+  })();
+}
+
+$('rotateBtn').addEventListener('click', async () => {
+  if (!selectedFile) return;
+  $('rotateBtn').disabled = true; $('rotateBtn').textContent = '旋转中...';
+  $('result').classList.remove('show');
+  $('progressArea').classList.add('show'); $('progressBar').style.width = '0%';
+  $('progressText').textContent = '正在处理...';
+  animateTo(80, 800);
+
+  const fd = new FormData();
+  fd.append('pdf', selectedFile);
+  fd.append('angle', selectedAngle);
+  if (scope === 'custom') fd.append('pages', $('pagesInput').value);
+
+  try {
+    const data = await fetch('/api/rotate', { method: 'POST', body: fd }).then(r => r.json());
+    $('progressBar').style.width = '100%'; $('progressText').textContent = '完成';
+    setTimeout(() => { $('progressArea').classList.remove('show'); showResult(data); }, 350);
+  } catch { $('progressArea').classList.remove('show'); showError('网络错误，请重试'); }
+  finally { $('rotateBtn').disabled = false; $('rotateBtn').textContent = '重新旋转'; }
+});
+
+function showResult(data) {
+  const r = $('result'); r.classList.add('show');
+  if (!data.success) { r.innerHTML = failHtml(data.error); return; }
+  _dlFile = data.file;
+  const angleLabel = selectedAngle === 90 ? '顺时针 90°' : selectedAngle === 180 ? '旋转 180°' : '逆时针 90°';
+  r.innerHTML = `
+    <div class="result-header ok"><span class="result-icon">✅</span><span class="result-title">旋转成功！</span></div>
+    <div class="result-body">
+      <div class="stats">
+        <div class="stat-box"><div class="stat-value">${data.pageCount}</div><div class="stat-label">总页数</div></div>
+        <div class="stat-box"><div class="stat-value green">${angleLabel}</div><div class="stat-label">旋转角度</div></div>
+        <div class="stat-box"><div class="stat-value">${fmtSize(data.size)}</div><div class="stat-label">文件大小</div></div>
+      </div>
+      <button class="btn btn-success" onclick="downloadFile(_dlFile)">⬇ 下载旋转后文件</button>
+    </div>`;
+}
+function showError(msg) { $('result').classList.add('show'); $('result').innerHTML = failHtml(msg); }
+function failHtml(msg) {
+  return `<div class="result-header fail"><span class="result-icon">❌</span><span class="result-title">失败</span></div><div class="result-body"><p class="error-msg">${msg}</p></div>`;
+}
+
+setupPaste(t => t === 'application/pdf', f => selectFile(f));
+</script>
+</body>
+</html>
