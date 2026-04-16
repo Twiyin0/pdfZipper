@@ -1,0 +1,20 @@
+import { ref } from 'vue'
+
+interface Toast {
+  id: number
+  msg: string
+}
+
+const toasts = ref<Toast[]>([])
+let nextId = 0
+
+export function useToast() {
+  function show(msg: string, duration = 2500) {
+    const id = nextId++
+    toasts.value.push({ id, msg })
+    setTimeout(() => {
+      toasts.value = toasts.value.filter(t => t.id !== id)
+    }, duration)
+  }
+  return { toasts, show }
+}

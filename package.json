@@ -1,15 +1,15 @@
 {
   "name": "pdfzipper",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "description": "PDF 工具箱",
+  "packageManager": "yarn@4.6.0",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "concurrently -k -n server,client -c cyan,green \"yarn dev:server\" \"yarn dev:client\"",
+    "dev:server": "tsx watch server.ts",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "tsx server.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "archiver": "^7.0.1",
     "canvas": "^3.2.3",
@@ -18,9 +18,27 @@
     "jsqr": "^1.4.0",
     "multer": "^2.1.1",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^2.16.105",
+    "pdfjs-dist": "2.16.105",
+    "pinia": "^2.3.1",
     "qrcode": "^1.5.4",
     "sharp": "^0.34.5",
-    "vercel": "^50.43.0"
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/diff": "^7.0.2",
+    "@types/express": "^5.0.1",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.15.3",
+    "@types/qrcode": "^1.5.5",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.3"
   }
 }

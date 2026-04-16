@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  input[type='range'] {
+    @apply w-full h-1.5 rounded-full outline-none cursor-pointer appearance-none;
+    background: #e5e7eb;
+  }
+  .dark input[type='range'] {
+    background: #4b5563;
+  }
+  input[type='range']::-webkit-slider-thumb {
+    @apply appearance-none w-4 h-4 rounded-full cursor-pointer shadow;
+    background: #6366f1;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold cursor-pointer transition-all duration-150 border-none;
+  }
+  .btn:active {
+    @apply scale-95;
+  }
+  .btn-primary {
+    @apply bg-indigo-500 text-white w-full mt-4 hover:bg-indigo-600 disabled:bg-indigo-200 disabled:cursor-not-allowed;
+  }
+  .dark .btn-primary:disabled {
+    @apply bg-indigo-900 text-gray-500;
+  }
+  .btn-success {
+    @apply bg-emerald-600 text-white w-full hover:bg-emerald-700;
+  }
+  .btn-gray {
+    @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
+  }
+  .dark .btn-gray {
+    @apply bg-gray-700 text-gray-200 hover:bg-gray-600;
+  }
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-xl;
+  }
+  .dark .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+  .card-wide {
+    @apply max-w-2xl;
+  }
+  .section-title {
+    @apply text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5;
+  }
+  .drop-zone {
+    @apply border-2 border-dashed border-gray-300 rounded-xl p-9 text-center cursor-pointer relative transition-all duration-200;
+    background: #fafafa;
+  }
+  .dark .drop-zone {
+    @apply border-gray-600;
+    background: rgba(17, 24, 39, 0.5);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    @apply border-indigo-500;
+    background: #f5f3ff;
+  }
+  .dark .drop-zone:hover, .dark .drop-zone.drag-over {
+    background: rgba(99, 102, 241, 0.1);
+  }
+  .file-item {
+    @apply flex items-center gap-2.5 border border-gray-200 rounded-xl px-3 py-2.5 cursor-grab transition-all duration-150 select-none;
+    background: #f9fafb;
+  }
+  .dark .file-item {
+    @apply border-gray-700;
+    background: rgba(17, 24, 39, 0.5);
+  }
+  .file-item:hover {
+    @apply border-indigo-200;
+    background: #f5f3ff;
+  }
+  .dark .file-item:hover {
+    @apply border-indigo-700;
+    background: rgba(99, 102, 241, 0.1);
+  }
+  .result-box {
+    @apply mt-5 rounded-xl overflow-hidden border border-gray-200;
+  }
+  .dark .result-box {
+    @apply border-gray-700;
+  }
+  .result-header-ok   { @apply bg-emerald-50; }
+  .result-header-warn { @apply bg-amber-50; }
+  .result-header-fail { @apply bg-red-50; }
+  .dark .result-header-ok   { background: rgba(6, 78, 59, 0.3); }
+  .dark .result-header-warn { background: rgba(120, 53, 15, 0.3); }
+  .dark .result-header-fail { background: rgba(127, 29, 29, 0.3); }
+  .stat-box {
+    @apply text-center p-2.5 rounded-lg;
+    background: #f9fafb;
+  }
+  .dark .stat-box {
+    background: rgba(17, 24, 39, 0.5);
+  }
+  .form-input {
+    @apply w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm outline-none transition-colors bg-white text-gray-900 focus:border-indigo-500;
+  }
+  .dark .form-input {
+    @apply border-gray-600 bg-gray-900 text-gray-100;
+  }
+  .form-label {
+    @apply text-xs font-semibold text-gray-500 mb-1.5 block;
+  }
+  .dark .form-label {
+    @apply text-gray-400;
+  }
+  .tab-btn {
+    @apply px-5 py-2.5 border-none bg-transparent text-sm font-semibold text-gray-500 cursor-pointer border-b-2 border-transparent -mb-0.5 transition-all duration-150;
+  }
+  .dark .tab-btn {
+    @apply text-gray-400;
+  }
+  .tab-btn.active {
+    @apply text-indigo-500 border-b-2 border-indigo-500;
+  }
+}
