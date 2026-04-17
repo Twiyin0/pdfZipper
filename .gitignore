@@ -10,5 +10,4 @@ yarn.lock
 example/
 .claude/settings.local.json
 .claude/projects/
-**/dist/**
-dist
+dist/
