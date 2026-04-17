@@ -1,6 +1,6 @@
 # PDF 工具箱 (pdfZipper)
 
-一个基于 Node.js + Express 的在线 PDF 与图片处理工具箱，部署于 Vercel，无需安装，开箱即用。
+一个基于 Vue 3 + Express 5 + TypeScript 的在线 PDF 与图片处理工具箱，部署于 Vercel，无需安装，开箱即用。
 
 **在线体验：** https://pdfzipper.vercel.app
 
@@ -44,7 +44,9 @@
 
 ## 技术栈
 
-- **运行时：** Node.js 20 + Express 5
+- **前端：** Vue 3 + Vue Router + Pinia + Tailwind CSS + TypeScript
+- **后端：** Node.js 20 + Express 5 + TypeScript
+- **构建：** Vite 6（前端）+ tsx（后端开发/运行）
 - **PDF 处理：** pdf-lib · pdfjs-dist@2.16.105
 - **图片处理：** sharp · canvas
 - **其他：** qrcode · jsqr · archiver · multer · diff
@@ -57,10 +59,10 @@
 ```bash
 git clone https://github.com/Twiyin0/pdfZipper.git
 cd pdfZipper
-npm install
-npm start        # http://localhost:3013
-# 或开发模式（文件变更自动重启）
-npm run dev
+yarn install
+yarn dev        # 同时启动 Express (3013) + Vite dev server
+# 或生产模式
+yarn build && yarn start
 ```
 
 ---
@@ -72,7 +74,10 @@ npm i -g vercel
 vercel deploy --prod
 ```
 
-项目已配置 `vercel.json`，部署后 API 路由自动映射到 Serverless Function，静态页面由 CDN 托管。
+项目已配置 `vercel.json`：
+- `api/index.ts` → Serverless Function（Express app）
+- `dist/`（`yarn build` 产物）→ CDN 静态托管
+- SPA fallback：所有非 API 请求指向 `index.html`
 
 ---
 
@@ -81,22 +86,20 @@ vercel deploy --prod
 ```
 pdfZipper/
 ├── api/
-│   └── index.js       # Express 应用（Vercel Serverless 入口）
-├── public/            # 静态前端页面
-│   ├── style.css
-│   ├── common.js
-│   ├── index.html
-│   ├── pdf_compress.html
-│   ├── pdf_merge.html
-│   ├── pdf_split.html
-│   ├── pdf_rotate.html
-│   ├── pdf_pages.html
-│   ├── pdf_compare.html
-│   ├── img_to_pdf.html
-│   ├── pdf_to_img.html
-│   └── ...
-├── server.js          # 本地开发入口（监听 3013 端口）
-├── vercel.json        # Vercel 部署配置
+│   └── index.ts           # Vercel Serverless 入口（re-export Express app）
+├── src/
+│   ├── server/
+│   │   └── index.ts       # Express 应用，所有 API 路由
+│   └── client/
+│       ├── main.ts
+│       ├── App.vue
+│       ├── router/        # Vue Router
+│       ├── stores/        # Pinia stores
+│       ├── components/    # 公共组件（DropZone, ResultBox, Toast...）
+│       └── views/         # 页面组件（按分类组织）
+├── server.ts              # 本地开发/生产入口
+├── vite.config.ts
+├── vercel.json
 └── package.json
 ```
 

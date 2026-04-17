@@ -7,10 +7,12 @@
 | 项目 | 说明 |
 |------|------|
 | 运行端口 | 3013 |
-| 启动命令 | `npm start` 或 `node server.js` |
-| 开发模式 | `npm run dev`（node --watch 自动重启） |
-| 主框架 | Express 5 |
-| 核心依赖 | pdf-lib · pdfjs-dist@2.16.105 · canvas · archiver · multer · sharp · qrcode · jsqr · diff |
+| 启动命令 | `yarn start`（tsx server.ts） |
+| 开发模式 | `yarn dev`（concurrently 同时启动 tsx watch + vite） |
+| 构建命令 | `yarn build`（vite build → dist/） |
+| 主框架 | Vue 3 + Express 5 + TypeScript |
+| 包管理器 | yarn 4（node-modules linker） |
+| 核心依赖 | pdf-lib · pdfjs-dist@2.16.105 · canvas · archiver · multer · sharp · qrcode · jsqr · diff · vue-router · pinia |
 
 ---
 
@@ -18,55 +20,93 @@
 
 ```
 pdfzipper/
-├── server.js              # 本地开发入口（监听 3013 端口）
+├── server.ts                  # 本地开发/生产入口（监听 3013 端口）
 ├── api/
-│   └── index.js           # Express 应用主体，所有 API 路由（Vercel Serverless 入口）
-├── package.json
-├── public/
-│   ├── style.css          # 全局共享样式（导航、卡片、按钮、进度、结果组件、toast）
-│   ├── common.js          # 公共 JS：剪贴板粘贴上传（setupPaste）+ Toast 提示（showToast）+ downloadFile
-│   ├── index.html         # 首页：4 类工具的卡片导航（PDF工具、图文处理、文本处理、图片处理）
-│   ├── pdf_compress.html  # PDF 压缩（DPI+质量双滑块，5 预设，自动降级显示）
-│   ├── pdf_merge.html     # PDF 合并（拖拽排序，8 种纸张尺寸统一）
-│   ├── pdf_split.html     # PDF 拆分（每页/自定义范围，ZIP 下载）
-│   ├── pdf_rotate.html    # PDF 旋转（90/180/270°，全部或指定页面）
-│   ├── pdf_pages.html     # PDF 页面管理（删除页面 / 提取页面，支持范围格式）
-│   ├── pdf_compare.html   # PDF 比对（双栏文字 diff，高亮新增/删除，按页导航）
-│   ├── img_to_pdf.html    # 图片转 PDF（缩略图拖拽排序，最多 50 张）
-│   ├── pdf_to_img.html    # PDF 转图片（单页→JPG，多页→ZIP）
-│   ├── qrcode.html        # 二维码：生成（PNG/SVG/JPG，颜色/尺寸/容错）+ 识别（jsQR）
-│   ├── hash.html          # 哈希散列：文本/文件，MD5/SHA1/SHA256/SHA512，十六进制/Base64
-│   ├── text_diff.html     # 文本比较：行/词/字符 diff，CDN jsdiff，纯客户端
-│   ├── text_escape.html   # 文本转义：Unicode / Base64 / URL 双向互转，纯客户端
-│   ├── json_format.html   # JSON 格式化：美化/压缩/Key排序/校验，纯客户端
-│   ├── img_compress.html  # 图片压缩：JPG/PNG/WebP，保持格式，质量滑块
-│   └── img_convert.html   # 图片格式转换：JPG↔PNG↔WebP↔AVIF，图片↔Base64
-├── outputs/               # 临时输出目录（文件 10 分钟后自动删除）
-└── .claude/commands/
-    └── pdfzipper.md       # 本 skill 文件
+│   └── index.ts               # Vercel Serverless 入口（re-export src/server/index.ts 的 app）
+├── src/
+│   ├── server/
+│   │   └── index.ts           # Express 应用主体，所有 API 路由
+│   └── client/
+│       ├── main.ts            # Vue 应用入口
+│       ├── App.vue            # 根组件（含 Sidebar + RouterView）
+│       ├── style.css          # 全局样式（Tailwind base + 自定义）
+│       ├── router/
+│       │   └── index.ts       # Vue Router 路由表
+│       ├── stores/
+│       │   └── theme.ts       # Pinia 主题 store（亮/暗模式）
+│       ├── utils/
+│       │   └── download.ts    # downloadFile(file) 工具函数
+│       ├── composables/
+│       │   └── useToast.ts    # Toast 提示 composable
+│       └── components/        # 公共组件
+│           ├── Sidebar.vue    # 侧边导航栏
+│           ├── ThemeToggle.vue
+│           ├── DropZone.vue   # 文件拖拽/点击上传区域
+│           ├── FileItem.vue   # 文件列表项（含删除/排序）
+│           ├── ProgressBar.vue
+│           ├── ResultBox.vue  # 操作结果展示（含下载按钮）
+│           └── Toast.vue
+│       └── views/             # 页面组件
+│           ├── pdf/
+│           │   ├── PdfCompress.vue
+│           │   ├── PdfMerge.vue
+│           │   ├── PdfSplit.vue
+│           │   ├── PdfRotate.vue
+│           │   ├── PdfPages.vue
+│           │   └── PdfCompare.vue
+│           ├── convert/
+│           │   ├── ImgToPdf.vue
+│           │   └── PdfToImg.vue
+│           ├── qrcode/
+│           │   └── QrCode.vue
+│           ├── text/
+│           │   ├── Hash.vue
+│           │   ├── TextDiff.vue
+│           │   ├── TextEscape.vue
+│           │   └── JsonFormat.vue
+│           └── image/
+│               ├── ImgCompress.vue
+│               └── ImgConvert.vue
+├── dist/                      # vite build 输出（Vercel 静态托管）
+├── vercel.json                # Vercel 部署配置
+├── vite.config.ts             # Vite 配置
+├── tailwind.config.js         # Tailwind 配置
+└── package.json
 ```
 
 ---
 
-## 工具分类（首页）
+## 路由表
 
-| 分类 | 工具 |
+| 路径 | 组件 |
 |------|------|
-| PDF 工具 | 压缩、合并、拆分、旋转、页面管理、PDF比对、图转PDF、PDF转图 |
-| 图文处理 | 二维码生成/识别 |
-| 文本处理 | 哈希散列、文本比较、文本转义、JSON格式化 |
-| 图片处理 | 图片压缩、图片格式转换 |
+| `/` | redirect → `/pdf/compress` |
+| `/pdf/compress` | PdfCompress.vue |
+| `/pdf/merge` | PdfMerge.vue |
+| `/pdf/split` | PdfSplit.vue |
+| `/pdf/rotate` | PdfRotate.vue |
+| `/pdf/pages` | PdfPages.vue |
+| `/pdf/compare` | PdfCompare.vue |
+| `/convert/img-to-pdf` | ImgToPdf.vue |
+| `/convert/pdf-to-img` | PdfToImg.vue |
+| `/qrcode` | QrCode.vue |
+| `/text/hash` | Hash.vue |
+| `/text/diff` | TextDiff.vue |
+| `/text/escape` | TextEscape.vue |
+| `/text/json` | JsonFormat.vue |
+| `/image/compress` | ImgCompress.vue |
+| `/image/convert` | ImgConvert.vue |
 
 ---
 
 ## API 路由一览
 
-所有路由在 `api/index.js` 中，文件上传使用 `multer`（内存存储）。API 响应统一使用 base64 内联文件对象（无需 `/api/download`）：
+所有路由在 `src/server/index.ts` 中，文件上传使用 `multer`（内存存储）。API 响应统一使用 base64 内联文件对象：
 
-```js
+```ts
 // 响应中的 file 字段格式
 { data: string (base64), mime: string, filename: string }
-// 前端用 common.js 的 downloadFile(file) 触发下载
+// 前端用 src/client/utils/download.ts 的 downloadFile(file) 触发下载
 ```
 
 ### `POST /api/compress`
@@ -154,7 +194,7 @@ pdfzipper/
 | `pdfs` | File[2] | 恰好两个 PDF 文件（pdfs[0]=原始，pdfs[1]=修改后） |
 
 响应：
-```js
+```ts
 {
   success, fileA, fileB,
   totalPages, pagesA, pagesB,
@@ -276,7 +316,7 @@ PDF 每页渲染为 JPG，单页直接输出 JPG，多页打包 ZIP。
 ## 关键实现细节
 
 ### 压缩逻辑（并行渲染）
-```js
+```ts
 // compressByDPI：Promise.all 并行渲染所有页面，再顺序嵌入 PDF
 const jpgs = await Promise.all(
   Array.from({ length: total }, async (_, i) => {
@@ -288,7 +328,7 @@ const jpgs = await Promise.all(
 ```
 
 ### 纸张尺寸表（单位：pt，1in=72pt）
-```js
+```ts
 const PAPER_SIZES = {
   a5: [420,595], a4: [595,842], a3: [842,1191],
   a2: [1191,1684], a1: [1684,2384],
@@ -296,73 +336,29 @@ const PAPER_SIZES = {
 };
 ```
 
-### 页面旋转（pdf-lib）
-```js
-const { degrees } = require('pdf-lib');
-page.setRotation(degrees((current + angle + 360) % 360));
-```
-
-### 删除页面（倒序避免索引偏移）
-```js
-for (let i = total - 1; i >= 0; i--) {
-  if (removeSet.has(i)) doc.removePage(i);
-}
-```
-
-### PDF 比对（diff 库）
-```js
-const Diff = require('diff');
-// 提取文字时按 y 坐标分组保留换行结构
-const changes = Diff.diffWords(textA, textB);
-// changes[i]: { type: 'added'|'removed'|'equal', value }
-```
-
 ### Canvas 工厂（pdfjs-dist Node.js 渲染依赖）
-```js
+```ts
 class NodeCanvasFactory {
-  create(w, h) { const c = createCanvas(w, h); return { canvas: c, context: c.getContext('2d') }; }
-  reset(p, w, h) { p.canvas.width = w; p.canvas.height = h; }
-  destroy(p)    { p.canvas.width = 0; p.canvas.height = 0; }
+  create(w: number, h: number) { const c = createCanvas(w, h); return { canvas: c, context: c.getContext('2d') }; }
+  reset(p: any, w: number, h: number) { p.canvas.width = w; p.canvas.height = h; }
+  destroy(p: any) { p.canvas.width = 0; p.canvas.height = 0; }
 }
 ```
-> pdfjs-dist 使用 `@2.16.105`，加载路径 `pdfjs-dist/legacy/build/pdf.js`，Node 环境需设 `workerSrc = false`。
+> pdfjs-dist 使用 `@2.16.105`，加载路径 `pdfjs-dist/legacy/build/pdf.js`，Node 环境需设 `workerSrc = null`。
 
-### 剪贴板粘贴上传（common.js）
-所有上传页面引入 `<script src="/common.js"></script>`，调用：
-```js
-setupPaste(acceptFn, handler)
-// acceptFn(mimeType) → boolean  决定接受什么类型的文件
-// handler(file)                 拿到 File 对象后的处理函数
+### 前端文件下载（utils/download.ts）
+```ts
+// 所有 API 响应的 file 字段通过此函数触发下载
+downloadFile({ data, mime, filename })
 ```
 
-各页面配置：
+### 前端组件约定
+- `DropZone.vue`：统一的文件拖拽/点击上传区域，emit `file-selected`
+- `ResultBox.vue`：展示操作结果，含下载按钮，接收 `file` prop
+- `useToast()`：composable，提供 `showToast(msg, type)` 方法
+- `Sidebar.vue`：侧边导航，按分类折叠展示所有工具链接
 
-| 页面 | acceptFn | handler |
-|------|----------|---------|
-| pdf_compress | `t === 'application/pdf'` | `selectFile(f)` |
-| pdf_merge | `t === 'application/pdf'` | `addFiles([f])` |
-| pdf_split | `t === 'application/pdf'` | `selectFile(f)` |
-| pdf_rotate | `t === 'application/pdf'` | `selectFile(f)` |
-| pdf_pages | `t === 'application/pdf'` | `selectFile(f)` |
-| pdf_compare | `t === 'application/pdf'` | 第1次→slotA，第2次→slotB |
-| img_to_pdf | `t.startsWith('image/')` | `addImages([f])` |
-| pdf_to_img | `t === 'application/pdf'` | `selectFile(f)` |
-| qrcode | `t.startsWith('image/')` | 切换到识别 tab → `setDecFile(f)` |
-| hash | `() => true`（任意文件） | 切换到文件 tab → `setFile(f)` |
-| img_compress | `t.startsWith('image/')` | `selectFile(f)` |
-| img_convert | `t.startsWith('image/')` | 按当前 tab 分发（fmt/enc） |
-
-### 前端拖拽排序（pdf_merge / img_to_pdf）
-使用 HTML5 原生 drag API：`dragstart` 记录 `dragSrc` id，`drop` 时对内存数组重排（`splice`），再调用 `render()` 重绘 DOM。
-
-### 纯客户端工具（无服务器调用）
-- **text_diff.html**：引入 CDN `jsdiff`，支持行/词/字符三种模式
-- **text_escape.html**：Unicode `\uXXXX` ↔ 文本、Base64 ↔ UTF-8 文本、encodeURIComponent ↔ 文本
-- **json_format.html**：美化（缩进可选 2/4/Tab）、压缩、Key 排序（递归）、实时校验
-
----
-
-## multer 配置汇总
+### multer 配置汇总
 
 | 实例 | 用途 | 大小限制 | 其他 |
 |------|------|----------|------|
@@ -372,22 +368,43 @@ setupPaste(acceptFn, handler)
 
 ---
 
+## Vercel 部署配置
+
+```json
+{
+  "builds": [
+    { "src": "api/index.ts", "use": "@vercel/node" },
+    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.ts" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
+```
+
+- `api/index.ts` → Serverless Function（Express app）
+- `dist/` → CDN 静态托管（vite build 产物）
+- SPA fallback：所有非 API、非静态文件的请求都指向 `index.html`
+
+---
+
 ## 添加新工具的步骤
 
-1. **api/index.js** 添加新路由（参考现有路由结构）
-2. **public/新页面.html** 引入 `/style.css` 和 `/common.js`，复制导航栏结构，设置正确的 `class="active"` 高亮项
-3. 若支持文件粘贴上传，在 script 末尾调用 `setupPaste(acceptFn, handler)`
-4. **public/index.html** 的对应分类 section 中添加新工具卡片
-5. 更新所有相关页面的 `.nav-links`（PDF 工具页面共享同一套导航）
+1. **src/server/index.ts** 添加新 API 路由
+2. **src/client/views/分类/NewTool.vue** 创建页面组件，使用 `DropZone`、`ResultBox`、`useToast` 等公共组件
+3. **src/client/router/index.ts** 添加路由记录
+4. **src/client/components/Sidebar.vue** 在对应分类下添加导航链接
 
 ---
 
 ## 常见任务
 
-- **修改上传大小限制**：`api/index.js` 中对应 `multer` 实例的 `limits.fileSize`
-- **添加新纸张尺寸**：在 `PAPER_SIZES` 对象中追加，并在 `pdf_merge.html` 的 `#sizeGrid` 添加按钮
+- **修改上传大小限制**：`src/server/index.ts` 中对应 `multer` 实例的 `limits.fileSize`
+- **添加新纸张尺寸**：`src/server/index.ts` 的 `PAPER_SIZES` 对象 + `PdfMerge.vue` 的尺寸选择 UI
 - **调整 PDF 转图片质量**：`/api/pdf-to-img` 路由中 `toBuffer('image/jpeg', { quality: 0.88 })`
-- **Toast 样式**：`style.css` 末尾 `.paste-toast` 类
+- **主题切换**：`src/client/stores/theme.ts`（Pinia store）
 
 ---
 
