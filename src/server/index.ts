@@ -1,5 +1,6 @@
 import express from 'express'
 import multer from 'multer'
+import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import archiver from 'archiver'
@@ -17,6 +18,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = null
 const app = express()
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+const distPath = path.join(__dirname, '../../dist')
+const shouldServeSpa = !process.env.VERCEL && fs.existsSync(path.join(distPath, 'index.html'))
 
 // ── multer configs ────────────────────────────────────────────────────────────
 const pdfUpload = multer({
@@ -38,9 +42,9 @@ const hashUpload = multer({
   limits: { fileSize: 500 * 1024 * 1024 },
 })
 
-// 本地生产模式提供前端静态文件（Vercel 由 CDN 直接提供）
-if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
-  app.use(express.static(path.join(__dirname, '../../dist')))
+// 本地运行时，如果已有构建产物则直接托管前端（Vercel 仍由平台处理）
+if (shouldServeSpa) {
+  app.use(express.static(distPath))
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -598,10 +602,9 @@ app.post('/api/img-from-base64', async (req, res) => {
   } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }) }
 })
 
-// 本地生产模式 SPA fallback（Vercel 由 vercel.json rewrites 处理）
-if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
-  const distPath = path.join(__dirname, '../../dist')
-  app.get('*', (_req, res) => {
+// 本地运行时的 SPA fallback（Vercel 由 vercel.json rewrites 处理）
+if (shouldServeSpa) {
+  app.get('/{*path}', (_req, res) => {
     res.sendFile(path.join(distPath, 'index.html'))
   })
 }
