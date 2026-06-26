@@ -3,7 +3,7 @@
     <h1 class="text-xl font-bold mb-1">PDF 拆分</h1>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">将 PDF 按页拆分，结果打包为 ZIP 下载</p>
 
-    <DropZone v-if="!file" accept=".pdf,application/pdf" icon="✂️" text="点击选择或拖拽 PDF 文件" hint="最大支持 200 MB" @files="onFiles" />
+    <DropZone v-if="!file" accept=".pdf,application/pdf" icon="scissors" text="点击选择或拖拽 PDF 文件" hint="最大支持 200 MB" @files="onFiles" />
     <FileItem v-else :name="file.name" :meta="`${fmtSize(file.size)}${totalPages ? ' · ' + totalPages + ' 页' : ''}`" @remove="clearFile" />
 
     <div class="mt-5">
@@ -49,7 +49,7 @@
             <div class="text-xs text-gray-400 mt-0.5">总页数</div>
           </div>
         </div>
-        <button class="btn btn-success" @click="downloadFile(result.file)">⬇ 下载 ZIP</button>
+        <button class="btn btn-success" @click="downloadFile(result.file)"><SvgIcon name="download" size="0.95rem" /> 下载 ZIP</button>
       </template>
       <template v-else-if="result">
         <p class="text-sm text-red-700 dark:text-red-400">{{ result.error }}</p>
@@ -64,6 +64,7 @@ import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
 import ResultBox from '../../components/ResultBox.vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
 import { useToast } from '../../composables/useToast'
 
@@ -118,7 +119,7 @@ onMounted(() => {
     const item = [...(e.clipboardData?.items ?? [])].find(i => i.kind === 'file' && i.type === 'application/pdf')
     if (!item) return
     const f = item.getAsFile()
-    if (f) { onFiles([f]); showToast(`📋 已粘贴：${f.name}`) }
+    if (f) { onFiles([f]); showToast(`已粘贴：${f.name}`) }
   })
 })
 </script>

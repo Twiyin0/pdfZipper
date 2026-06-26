@@ -9,21 +9,25 @@
     @dragleave="$emit('dragleave', $event)"
     @drop.prevent="$emit('drop', $event)"
   >
-    <span v-if="sortable" class="text-gray-300 dark:text-gray-600 text-base cursor-grab">⠿</span>
-    <span class="text-xl">{{ icon }}</span>
+    <SvgIcon v-if="sortable" name="menu" size="1rem" class="text-gray-300 dark:text-gray-600 cursor-grab" />
+    <SvgIcon :name="icon" size="1.25rem" class="text-gray-500 dark:text-gray-400" />
     <div class="flex-1 overflow-hidden">
       <div class="text-sm font-semibold truncate text-gray-800 dark:text-gray-200">{{ name }}</div>
       <div class="text-xs text-gray-400 mt-0.5">{{ meta }}</div>
     </div>
     <button
       v-if="removable"
-      class="text-gray-400 hover:text-red-500 transition-colors text-sm px-1"
+      class="inline-flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors px-1"
       @click.stop="$emit('remove')"
-    >✕</button>
+    >
+      <SvgIcon name="xmark" size="0.875rem" />
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
+import SvgIcon from './SvgIcon.vue'
+
 withDefaults(defineProps<{
   name: string
   meta?: string
@@ -33,7 +37,7 @@ withDefaults(defineProps<{
   dragging?: boolean
   dragTarget?: boolean
 }>(), {
-  icon: '📄',
+  icon: 'file-alt',
   sortable: false,
   removable: true,
   dragging: false,

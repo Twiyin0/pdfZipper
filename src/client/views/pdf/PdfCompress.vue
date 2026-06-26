@@ -6,7 +6,7 @@
     <DropZone
       v-if="!file"
       accept=".pdf,application/pdf"
-      icon="📄"
+      icon="file-alt"
       text="点击选择或拖拽 PDF 文件"
       hint="最大支持 200 MB"
       @files="onFiles"
@@ -93,10 +93,11 @@
             class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full"
             :class="result.method === 'stream' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'"
           >
-            {{ result.method === 'stream' ? '🔵 对象流压缩' : `🟣 DPI 渲染 (${result.dpi} DPI · ${Math.round(result.jpegQuality * 100)}%)` }}
+            <span class="w-2 h-2 rounded-full" :class="result.method === 'stream' ? 'bg-blue-500' : 'bg-primary-500'" />
+            {{ result.method === 'stream' ? '对象流压缩' : `DPI 渲染 (${result.dpi} DPI · ${Math.round(result.jpegQuality * 100)}%)` }}
           </span>
         </div>
-        <button class="btn btn-success" @click="downloadFile(result.file)">⬇ 下载压缩文件</button>
+        <button class="btn btn-success" @click="downloadFile(result.file)"><SvgIcon name="download" size="0.95rem" /> 下载压缩文件</button>
       </template>
       <template v-else-if="result">
         <p class="text-sm text-red-700 dark:text-red-400">{{ result.error }}</p>
@@ -111,6 +112,7 @@ import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
 import ResultBox from '../../components/ResultBox.vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
 import { useToast } from '../../composables/useToast'
 
@@ -200,7 +202,7 @@ onMounted(() => {
     const item = [...(e.clipboardData?.items ?? [])].find(i => i.kind === 'file' && i.type === 'application/pdf')
     if (!item) return
     const f = item.getAsFile()
-    if (f) { onFiles([f]); showToast(`📋 已粘贴：${f.name}`) }
+    if (f) { onFiles([f]); showToast(`已粘贴：${f.name}`) }
   })
 })
 </script>

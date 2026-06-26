@@ -3,8 +3,8 @@
     <h1 class="text-xl font-bold mb-1">图片压缩</h1>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">压缩 JPG/PNG/WebP 图片，保持原始格式</p>
 
-    <DropZone v-if="!file" accept="image/*" icon="🗜️" text="点击选择或拖拽图片" hint="最大支持 50 MB · JPG/PNG/WebP" @files="onFiles" />
-    <FileItem v-else :name="file.name" :meta="fmtSize(file.size)" icon="🖼️" @remove="clearFile" />
+    <DropZone v-if="!file" accept="image/*" icon="compress-alt" text="点击选择或拖拽图片" hint="最大支持 50 MB · JPG/PNG/WebP" @files="onFiles" />
+    <FileItem v-else :name="file.name" :meta="fmtSize(file.size)" icon="image" @remove="clearFile" />
 
     <div class="mt-5">
       <div class="mb-3">
@@ -46,7 +46,7 @@
           </div>
         </div>
         <p class="text-xs text-gray-500 text-center mb-3">{{ result.width }} × {{ result.height }} px · {{ result.ext.toUpperCase() }}</p>
-        <button class="btn btn-success" @click="downloadFile(result.file)">⬇ 下载压缩图片</button>
+        <button class="btn btn-success" @click="downloadFile(result.file)"><SvgIcon name="download" size="0.95rem" /> 下载压缩图片</button>
       </template>
       <template v-else-if="result">
         <p class="text-sm text-red-700 dark:text-red-400">{{ result.error }}</p>
@@ -61,6 +61,7 @@ import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
 import ResultBox from '../../components/ResultBox.vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
 import { useToast } from '../../composables/useToast'
 
@@ -100,7 +101,7 @@ onMounted(() => {
     const item = [...(e.clipboardData?.items ?? [])].find(i => i.kind === 'file' && i.type.startsWith('image/'))
     if (!item) return
     const f = item.getAsFile()
-    if (f) { onFiles([f]); showToast('📋 已粘贴截图') }
+    if (f) { onFiles([f]); showToast('已粘贴截图') }
   })
 })
 </script>

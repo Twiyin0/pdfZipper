@@ -18,7 +18,7 @@
           class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-colors duration-150"
           active-class="bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 font-semibold"
         >
-          <span class="text-base leading-none">{{ item.icon }}</span>
+          <SvgIcon :name="item.icon" size="1rem" class="leading-none" />
           <span>{{ item.label }}</span>
         </RouterLink>
       </template>
@@ -33,41 +33,42 @@
 
 <script setup lang="ts">
 import ThemeToggle from './ThemeToggle.vue'
+import SvgIcon from './SvgIcon.vue'
 
 const navGroups = [
   {
     label: 'PDF 工具',
     items: [
-      { path: '/pdf/compress',       icon: '🗜️', label: '压缩' },
-      { path: '/pdf/merge',          icon: '🔗', label: '合并' },
-      { path: '/pdf/split',          icon: '✂️', label: '拆分' },
-      { path: '/pdf/rotate',         icon: '🔄', label: '旋转' },
-      { path: '/pdf/pages',          icon: '📑', label: '页面管理' },
-      { path: '/pdf/compare',        icon: '🔍', label: 'PDF 比对' },
-      { path: '/convert/img-to-pdf', icon: '🖼️', label: '图转 PDF' },
-      { path: '/convert/pdf-to-img', icon: '📸', label: 'PDF 转图' },
+      { path: '/pdf/compress',       icon: 'compress', label: '压缩' },
+      { path: '/pdf/merge',          icon: 'link', label: '合并' },
+      { path: '/pdf/split',          icon: 'scissors', label: '拆分' },
+      { path: '/pdf/rotate',         icon: 'rotate-cw', label: '旋转' },
+      { path: '/pdf/pages',          icon: 'files-alt', label: '页面管理' },
+      { path: '/pdf/compare',        icon: 'search', label: 'PDF 比对' },
+      { path: '/convert/img-to-pdf', icon: 'image', label: '图转 PDF' },
+      { path: '/convert/pdf-to-img', icon: 'camera', label: 'PDF 转图' },
     ],
   },
   {
     label: '图文处理',
     items: [
-      { path: '/qrcode', icon: '🔲', label: '二维码' },
+      { path: '/qrcode', icon: 'scan', label: '二维码' },
     ],
   },
   {
     label: '文本处理',
     items: [
-      { path: '/text/hash',   icon: '#️⃣', label: '哈希散列' },
-      { path: '/text/diff',   icon: '🔀', label: '文本比较' },
-      { path: '/text/escape', icon: '🔤', label: '文本转义' },
-      { path: '/text/json',   icon: '{}', label: 'JSON 格式化' },
+      { path: '/text/hash',   icon: 'hashtag', label: '哈希散列' },
+      { path: '/text/diff',   icon: 'code-compare', label: '文本比较' },
+      { path: '/text/escape', icon: 'brackets-curly', label: '文本转义' },
+      { path: '/text/json',   icon: 'code', label: 'JSON 格式化' },
     ],
   },
   {
     label: '图片处理',
     items: [
-      { path: '/image/compress', icon: '🗜️', label: '图片压缩' },
-      { path: '/image/convert',  icon: '🔁', label: '格式转换' },
+      { path: '/image/compress', icon: 'compress-alt', label: '图片压缩' },
+      { path: '/image/convert',  icon: 'refresh-cw', label: '格式转换' },
     ],
   },
 ]

@@ -15,7 +15,7 @@
       :multiple="multiple"
       @change="onFileChange"
     />
-    <div class="text-4xl mb-2 pointer-events-none">{{ icon }}</div>
+    <SvgIcon :name="icon" size="2.5rem" class="mb-2 pointer-events-none text-gray-400 dark:text-gray-500" />
     <div class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 pointer-events-none">{{ text }}</div>
     <div class="text-xs text-gray-400 pointer-events-none">{{ hint }} · Ctrl+V 粘贴</div>
   </div>
@@ -23,6 +23,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import SvgIcon from './SvgIcon.vue'
 
 const props = withDefaults(defineProps<{
   accept?: string
@@ -33,7 +34,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   accept: '*',
   multiple: false,
-  icon: '📄',
+  icon: 'file-alt',
   text: '点击选择或拖拽文件',
   hint: '',
 })

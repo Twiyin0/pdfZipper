@@ -15,8 +15,10 @@
         @click="slotInputs[slot]?.click()"
       >
         <input :ref="el => slotInputs[slot] = el as HTMLInputElement" type="file" accept=".pdf,application/pdf" class="hidden" @change="onSlotChange(slot, $event)" />
-        <button v-if="getSlotFile(slot)" class="absolute top-1.5 right-2 text-gray-400 hover:text-red-500 text-sm" @click.stop="clearSlot(slot)">✕</button>
-        <div class="text-2xl mb-1.5">{{ getSlotFile(slot) ? '✅' : '📄' }}</div>
+        <button v-if="getSlotFile(slot)" class="absolute top-1.5 right-2 inline-flex items-center justify-center text-gray-400 hover:text-red-500" @click.stop="clearSlot(slot)"><SvgIcon name="xmark" size="0.875rem" /></button>
+        <div class="mb-1.5 text-gray-400 dark:text-gray-500">
+          <SvgIcon :name="getSlotFile(slot) ? 'circle-check' : 'file-alt'" size="1.75rem" />
+        </div>
         <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">文件 {{ slot }}（{{ slot === 'A' ? '原始' : '修改后' }}）</div>
         <div class="text-xs font-semibold text-gray-700 dark:text-gray-300 break-all">
           {{ getSlotFile(slot)?.name ?? '点击或拖拽上传' }}
@@ -79,18 +81,21 @@
             currentPage === p.page && p.identical ? 'bg-primary-50 dark:bg-primary-900/20' : '',
           ]"
           @click="currentPage = p.page"
-        >第 {{ p.page }} 页{{ p.identical ? '' : ' ●' }}</button>
+        >第 {{ p.page }} 页{{ p.identical ? '' : ' ·' }}</button>
       </div>
 
       <!-- Diff view -->
       <div v-if="currentPageData">
         <div v-if="currentPageData.identical" class="text-center py-6 text-gray-400 text-sm bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-          ✅ 第 {{ currentPage }} 页内容完全相同
+          <div class="inline-flex items-center gap-2">
+            <SvgIcon name="circle-check" size="1rem" class="text-emerald-600 dark:text-emerald-400" />
+            <span>第 {{ currentPage }} 页内容完全相同</span>
+          </div>
         </div>
         <div v-else>
           <div class="grid grid-cols-2 border border-gray-200 dark:border-gray-700 rounded-t-xl overflow-hidden">
-            <div class="px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 truncate">📄 {{ compareData.fileA }}</div>
-            <div class="px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 truncate">📄 {{ compareData.fileB }}</div>
+            <div class="px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 truncate"><span class="inline-flex items-center gap-1.5"><SvgIcon name="file-alt" size="0.8rem" /> {{ compareData.fileA }}</span></div>
+            <div class="px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 dark:bg-gray-800 truncate"><span class="inline-flex items-center gap-1.5"><SvgIcon name="file-alt" size="0.8rem" /> {{ compareData.fileB }}</span></div>
           </div>
           <div class="grid grid-cols-2 border border-t-0 border-gray-200 dark:border-gray-700 rounded-b-xl overflow-hidden text-sm leading-relaxed">
             <div class="p-4 bg-gray-50 dark:bg-gray-900/50 border-r border-gray-200 dark:border-gray-700 overflow-auto max-h-96 whitespace-pre-wrap break-words" v-html="diffHtmlA" />
@@ -109,6 +114,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import ProgressBar from '../../components/ProgressBar.vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { fmtSize } from '../../utils/download'
 import { useToast } from '../../composables/useToast'
 
@@ -222,7 +228,7 @@ onMounted(() => {
     if (!f) return
     if (!fileA.value) { setSlotFile('A', f); pasteCount = 1 }
     else if (!fileB.value) { setSlotFile('B', f); pasteCount = 2 }
-    showToast(`📋 已粘贴到文件 ${pasteCount === 1 ? 'A' : 'B'}`)
+    showToast(`已粘贴到文件 ${pasteCount === 1 ? 'A' : 'B'}`)
   })
 })
 </script>

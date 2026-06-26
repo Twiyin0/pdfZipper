@@ -6,7 +6,7 @@
     <DropZone
       accept="image/*"
       multiple
-      icon="🖼️"
+      icon="image"
       text="点击选择或拖拽图片"
       hint="最多 50 张 · 支持 JPG/PNG/WebP 等"
       @files="addImages"
@@ -18,7 +18,7 @@
         :key="item.id"
         :name="item.file.name"
         :meta="fmtSize(item.file.size)"
-        icon="🖼️"
+        icon="image"
         sortable
         :dragging="dragSrc === item.id"
         :drag-target="dragTarget === item.id"
@@ -37,7 +37,10 @@
         @click="addMoreInput?.click()"
       >
         <input ref="addMoreInput" type="file" accept="image/*" multiple class="hidden" @change="onAddMore" />
-        ＋ 继续添加图片
+        <span class="inline-flex items-center gap-1.5">
+          <SvgIcon name="plus" size="0.9rem" />
+          继续添加图片
+        </span>
       </button>
     </div>
 
@@ -59,7 +62,7 @@
             <div class="text-xs text-gray-400 mt-0.5">文件大小</div>
           </div>
         </div>
-        <button class="btn btn-success" @click="downloadFile(result.file)">⬇ 下载 PDF</button>
+        <button class="btn btn-success" @click="downloadFile(result.file)"><SvgIcon name="download" size="0.95rem" /> 下载 PDF</button>
       </template>
       <template v-else-if="result">
         <p class="text-sm text-red-700 dark:text-red-400">{{ result.error }}</p>
@@ -74,6 +77,7 @@ import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
 import ResultBox from '../../components/ResultBox.vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
 import { useToast } from '../../composables/useToast'
 
@@ -135,7 +139,7 @@ onMounted(() => {
     const item = [...(e.clipboardData?.items ?? [])].find(i => i.kind === 'file' && i.type.startsWith('image/'))
     if (!item) return
     const f = item.getAsFile()
-    if (f) { addImages([f]); showToast('📋 已粘贴截图') }
+    if (f) { addImages([f]); showToast('已粘贴截图') }
   })
 })
 </script>

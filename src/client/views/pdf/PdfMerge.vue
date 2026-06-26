@@ -6,7 +6,7 @@
     <DropZone
       accept=".pdf,application/pdf"
       multiple
-      icon="🔗"
+      icon="link"
       text="点击选择或拖拽 PDF 文件"
       hint="可同时选择多个文件 · 最大单文件 200 MB"
       @files="addFiles"
@@ -38,7 +38,10 @@
         @click="addMoreInput?.click()"
       >
         <input ref="addMoreInput" type="file" accept=".pdf,application/pdf" multiple class="hidden" @change="onAddMore" />
-        ＋ 继续添加 PDF
+        <span class="inline-flex items-center gap-1.5">
+          <SvgIcon name="plus" size="0.9rem" />
+          继续添加 PDF
+        </span>
       </button>
     </div>
 
@@ -81,7 +84,7 @@
           </div>
         </div>
         <p class="text-xs text-gray-500 text-center mb-3">页面尺寸：{{ selectedSize === 'original' ? '原始尺寸' : selectedSize.toUpperCase() }}</p>
-        <button class="btn btn-success" @click="downloadFile(result.file)">⬇ 下载合并文件</button>
+        <button class="btn btn-success" @click="downloadFile(result.file)"><SvgIcon name="download" size="0.95rem" /> 下载合并文件</button>
       </template>
       <template v-else-if="result">
         <p class="text-sm text-red-700 dark:text-red-400">{{ result.error }}</p>
@@ -96,6 +99,7 @@ import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
 import ResultBox from '../../components/ResultBox.vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
 import { useToast } from '../../composables/useToast'
 
@@ -177,7 +181,7 @@ onMounted(() => {
     const item = [...(e.clipboardData?.items ?? [])].find(i => i.kind === 'file' && i.type === 'application/pdf')
     if (!item) return
     const f = item.getAsFile()
-    if (f) { addFiles([f]); showToast(`📋 已粘贴：${f.name}`) }
+    if (f) { addFiles([f]); showToast(`已粘贴：${f.name}`) }
   })
 })
 </script>

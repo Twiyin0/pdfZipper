@@ -35,6 +35,9 @@
   .btn-success {
     @apply bg-emerald-600 text-white w-full hover:bg-emerald-700;
   }
+  .btn-icon {
+    @apply inline-flex items-center justify-center;
+  }
   .btn-gray {
     @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
   }

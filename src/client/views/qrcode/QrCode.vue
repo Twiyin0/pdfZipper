@@ -56,7 +56,7 @@
 
       <!-- Preview -->
       <div class="text-center my-4">
-        <div v-if="!genPreview" class="w-40 h-40 bg-gray-100 dark:bg-gray-800 rounded-xl mx-auto flex items-center justify-center text-4xl text-gray-300">🔲</div>
+        <div v-if="!genPreview" class="w-40 h-40 bg-gray-100 dark:bg-gray-800 rounded-xl mx-auto flex items-center justify-center text-gray-300 dark:text-gray-600"><SvgIcon name="scan" size="2.75rem" /></div>
         <img v-else :src="genPreview" class="max-w-48 rounded-xl border border-gray-200 dark:border-gray-700 mx-auto" />
       </div>
 
@@ -67,14 +67,14 @@
       <ProgressBar :show="genLoading" :progress="genProgress" text="正在生成..." />
 
       <div v-if="genFile" class="mt-3">
-        <button class="btn btn-success" @click="downloadFile(genFile)">⬇ 下载二维码</button>
+        <button class="btn btn-success" @click="downloadFile(genFile)"><SvgIcon name="download" size="0.95rem" /> 下载二维码</button>
       </div>
     </template>
 
     <!-- Decode tab -->
     <template v-if="tab === 'dec'">
-      <DropZone v-if="!decFile" accept="image/*" icon="🔍" text="点击选择或拖拽二维码图片" hint="支持 JPG、PNG、WebP 等" @files="onDecFiles" />
-      <FileItem v-else :name="decFile.name" :meta="fmtSize(decFile.size)" icon="🖼️" @remove="decFile = null; decResult = null" />
+      <DropZone v-if="!decFile" accept="image/*" icon="search" text="点击选择或拖拽二维码图片" hint="支持 JPG、PNG、WebP 等" @files="onDecFiles" />
+      <FileItem v-else :name="decFile.name" :meta="fmtSize(decFile.size)" icon="image" @remove="decFile = null; decResult = null" />
 
       <button class="btn btn-primary" :disabled="!decFile || decLoading" @click="decode">
         {{ decLoading ? '识别中...' : decFile ? '开始识别' : '上传图片后识别' }}
@@ -101,6 +101,7 @@ import { ref, onMounted } from 'vue'
 import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
 import type { B64File } from '../../utils/download'
 import { useToast } from '../../composables/useToast'
@@ -173,7 +174,7 @@ onMounted(() => {
     const item = [...(e.clipboardData?.items ?? [])].find(i => i.kind === 'file' && i.type.startsWith('image/'))
     if (!item) return
     const f = item.getAsFile()
-    if (f) { tab.value = 'dec'; decFile.value = f; showToast('📋 已粘贴截图') }
+    if (f) { tab.value = 'dec'; decFile.value = f; showToast('已粘贴截图') }
   })
 })
 </script>

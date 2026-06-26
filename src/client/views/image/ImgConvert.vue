@@ -1,7 +1,7 @@
 <template>
   <div class="card">
     <h1 class="text-xl font-bold mb-1">图片格式转换</h1>
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">JPG ↔ PNG ↔ WebP ↔ AVIF，图片 ↔ Base64</p>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">JPG / PNG / WebP / AVIF 与图片 Base64 互转</p>
 
     <!-- Tabs -->
     <div class="flex border-b-2 border-gray-200 dark:border-gray-700 mb-6">
@@ -10,8 +10,8 @@
 
     <!-- Format conversion tab -->
     <template v-if="tab === 'fmt'">
-      <DropZone v-if="!file" accept="image/*" icon="🔁" text="点击选择或拖拽图片" hint="最大支持 50 MB" @files="onFiles" />
-      <FileItem v-else :name="file.name" :meta="fmtSize(file.size)" icon="🖼️" @remove="clearFile" />
+      <DropZone v-if="!file" accept="image/*" icon="refresh-cw" text="点击选择或拖拽图片" hint="最大支持 50 MB" @files="onFiles" />
+      <FileItem v-else :name="file.name" :meta="fmtSize(file.size)" icon="image" @remove="clearFile" />
 
       <div class="mt-5">
         <div class="section-title">目标格式</div>
@@ -54,7 +54,7 @@
               <div class="text-xs text-gray-400 mt-0.5">转换后</div>
             </div>
           </div>
-          <button class="btn btn-success" @click="downloadFile(result.file)">⬇ 下载 {{ result.ext.toUpperCase() }}</button>
+          <button class="btn btn-success" @click="downloadFile(result.file)"><SvgIcon name="download" size="0.95rem" /> 下载 {{ result.ext.toUpperCase() }}</button>
         </template>
         <template v-else-if="result">
           <p class="text-sm text-red-700 dark:text-red-400">{{ result.error }}</p>
@@ -64,8 +64,8 @@
 
     <!-- Base64 encode tab -->
     <template v-if="tab === 'enc'">
-      <DropZone v-if="!encFile" accept="image/*" icon="🔤" text="点击选择或拖拽图片" hint="图片转 Base64" @files="onEncFiles" />
-      <FileItem v-else :name="encFile.name" :meta="fmtSize(encFile.size)" icon="🖼️" @remove="encFile = null; encResult = ''" />
+      <DropZone v-if="!encFile" accept="image/*" icon="brackets-curly" text="点击选择或拖拽图片" hint="图片转 Base64" @files="onEncFiles" />
+      <FileItem v-else :name="encFile.name" :meta="fmtSize(encFile.size)" icon="image" @remove="encFile = null; encResult = ''" />
 
       <button class="btn btn-primary" :disabled="!encFile" @click="encodeBase64">转为 Base64</button>
 
@@ -92,7 +92,7 @@
       <ResultBox :show="!!decResult" :type="decResult?.success ? 'ok' : 'fail'" :title="decResult?.success ? '解码成功！' : '失败'">
         <template v-if="decResult?.success">
           <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">{{ decResult.ext.toUpperCase() }} · {{ fmtSize(decResult.size) }}</p>
-          <button class="btn btn-success" @click="downloadFile(decResult.file)">⬇ 下载图片</button>
+          <button class="btn btn-success" @click="downloadFile(decResult.file)"><SvgIcon name="download" size="0.95rem" /> 下载图片</button>
         </template>
         <template v-else-if="decResult">
           <p class="text-sm text-red-700 dark:text-red-400">{{ decResult.error }}</p>
@@ -108,6 +108,7 @@ import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
 import ResultBox from '../../components/ResultBox.vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
 import { useToast } from '../../composables/useToast'
 
@@ -115,8 +116,8 @@ const { show: showToast } = useToast()
 const tab = ref('fmt')
 const tabs = [
   { value: 'fmt', label: '格式转换' },
-  { value: 'enc', label: '图片→Base64' },
-  { value: 'dec', label: 'Base64→图片' },
+  { value: 'enc', label: '图片到 Base64' },
+  { value: 'dec', label: 'Base64 到图片' },
 ]
 const formats = [
   { value: 'jpeg', label: 'JPEG' },
@@ -205,8 +206,8 @@ onMounted(() => {
     if (!item) return
     const f = item.getAsFile()
     if (!f) return
-    if (tab.value === 'fmt') { onFiles([f]); showToast('📋 已粘贴截图') }
-    else if (tab.value === 'enc') { onEncFiles([f]); showToast('📋 已粘贴截图') }
+    if (tab.value === 'fmt') { onFiles([f]); showToast('已粘贴截图') }
+    else if (tab.value === 'enc') { onEncFiles([f]); showToast('已粘贴截图') }
   })
 })
 </script>

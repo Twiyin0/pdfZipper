@@ -12,8 +12,8 @@
       <label class="form-label">原始文本</label>
       <textarea v-model="unicodeInput" class="form-input h-24 resize-none mb-2" placeholder="输入文本..." />
       <div class="flex gap-2 mb-3">
-        <button class="btn btn-gray flex-1" @click="unicodeEncode">编码 →</button>
-        <button class="btn btn-gray flex-1" @click="unicodeDecode">← 解码</button>
+        <button class="btn btn-gray flex-1" @click="unicodeEncode">编码 <SvgIcon name="arrow-right" size="0.9rem" /></button>
+        <button class="btn btn-gray flex-1" @click="unicodeDecode"><SvgIcon name="arrow-left" size="0.9rem" /> 解码</button>
       </div>
       <label class="form-label">Unicode 转义</label>
       <textarea v-model="unicodeOutput" class="form-input font-mono h-24 resize-none mb-2" placeholder="\\u4e2d\\u6587..." />
@@ -24,8 +24,8 @@
       <label class="form-label">原始文本（UTF-8）</label>
       <textarea v-model="b64Input" class="form-input h-24 resize-none mb-2" placeholder="输入文本..." />
       <div class="flex gap-2 mb-3">
-        <button class="btn btn-gray flex-1" @click="b64Encode">编码 →</button>
-        <button class="btn btn-gray flex-1" @click="b64Decode">← 解码</button>
+        <button class="btn btn-gray flex-1" @click="b64Encode">编码 <SvgIcon name="arrow-right" size="0.9rem" /></button>
+        <button class="btn btn-gray flex-1" @click="b64Decode"><SvgIcon name="arrow-left" size="0.9rem" /> 解码</button>
       </div>
       <label class="form-label">Base64</label>
       <textarea v-model="b64Output" class="form-input font-mono h-24 resize-none mb-2" placeholder="Base64 字符串..." />
@@ -36,8 +36,8 @@
       <label class="form-label">原始文本</label>
       <textarea v-model="urlInput" class="form-input h-24 resize-none mb-2" placeholder="输入文本或 URL..." />
       <div class="flex gap-2 mb-3">
-        <button class="btn btn-gray flex-1" @click="urlEncode">编码 →</button>
-        <button class="btn btn-gray flex-1" @click="urlDecode">← 解码</button>
+        <button class="btn btn-gray flex-1" @click="urlEncode">编码 <SvgIcon name="arrow-right" size="0.9rem" /></button>
+        <button class="btn btn-gray flex-1" @click="urlDecode"><SvgIcon name="arrow-left" size="0.9rem" /> 解码</button>
       </div>
       <label class="form-label">URL 编码</label>
       <textarea v-model="urlOutput" class="form-input font-mono h-24 resize-none mb-2" placeholder="%E4%B8%AD%E6%96%87..." />
@@ -50,6 +50,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { useToast } from '../../composables/useToast'
 
 const { show: showToast } = useToast()

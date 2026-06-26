@@ -14,8 +14,8 @@
     </template>
 
     <template v-if="tab === 'file'">
-      <DropZone v-if="!file" icon="📁" text="点击选择或拖拽任意文件" hint="最大支持 500 MB" @files="onFiles" />
-      <FileItem v-else :name="file.name" :meta="fmtSize(file.size)" icon="📁" @remove="file = null; result = null" />
+      <DropZone v-if="!file" icon="folder" text="点击选择或拖拽任意文件" hint="最大支持 500 MB" @files="onFiles" />
+      <FileItem v-else :name="file.name" :meta="fmtSize(file.size)" icon="folder" @remove="file = null; result = null" />
     </template>
 
     <div class="flex gap-3 mt-4 mb-2">
@@ -116,7 +116,7 @@ onMounted(() => {
     const item = [...(e.clipboardData?.items ?? [])].find(i => i.kind === 'file')
     if (!item) return
     const f = item.getAsFile()
-    if (f) { tab.value = 'file'; file.value = f; showToast(`📋 已粘贴：${f.name || '文件'}`) }
+    if (f) { tab.value = 'file'; file.value = f; showToast(`已粘贴：${f.name || '文件'}`) }
   })
 })
 </script>

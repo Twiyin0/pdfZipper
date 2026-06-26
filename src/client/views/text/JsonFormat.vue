@@ -25,8 +25,9 @@
     />
 
     <div class="flex items-center gap-2 mb-4">
-      <span class="text-xs" :class="valid === null ? 'text-gray-400' : valid ? 'text-emerald-600' : 'text-red-500'">
-        {{ valid === null ? '等待输入...' : valid ? '✓ JSON 有效' : `✗ ${errMsg}` }}
+      <span class="inline-flex items-center gap-1.5 text-xs" :class="valid === null ? 'text-gray-400' : valid ? 'text-emerald-600' : 'text-red-500'">
+        <SvgIcon v-if="valid !== null" :name="valid ? 'check' : 'xmark'" size="0.75rem" />
+        {{ valid === null ? '等待输入...' : valid ? 'JSON 有效' : errMsg }}
       </span>
       <button class="btn btn-gray ml-auto px-3 py-1 text-xs" @click="copyText(input)">复制</button>
       <button class="btn btn-gray px-3 py-1 text-xs" @click="input = ''; valid = null">清空</button>
@@ -36,6 +37,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import SvgIcon from '../../components/SvgIcon.vue'
 import { useToast } from '../../composables/useToast'
 
 const { show: showToast } = useToast()

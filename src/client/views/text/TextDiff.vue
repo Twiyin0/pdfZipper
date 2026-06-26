@@ -19,7 +19,7 @@
       <button v-for="m in modes" :key="m.value" class="px-3 py-1 border-2 rounded-lg text-xs font-semibold transition-all"
         :class="mode === m.value ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-primary-400'"
         @click="mode = m.value">{{ m.label }}</button>
-      <button class="btn btn-gray ml-auto px-3 py-1 text-xs" @click="swap">⇄ 交换 A/B</button>
+      <button class="btn btn-gray ml-auto px-3 py-1 text-xs" @click="swap"><SvgIcon name="arrow-down-arrow-up" size="0.9rem" /> 交换 A/B</button>
       <button class="btn btn-primary mt-0 w-auto px-4 py-1.5 text-xs" @click="diff">对比</button>
     </div>
 
@@ -54,6 +54,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import * as Diff from 'diff'
+import SvgIcon from '../../components/SvgIcon.vue'
 
 const textA = ref('')
 const textB = ref('')
