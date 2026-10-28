@@ -6,8 +6,8 @@ uploads/
 package-lock.json
 yarn.lock
 .DS_Store
+._*
 .yarn
 example/
-.claude/settings.local.json
-.claude/projects/
+.claude/
 dist/

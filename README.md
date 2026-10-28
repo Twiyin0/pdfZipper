@@ -65,6 +65,24 @@ yarn dev        # 同时启动 Express (3013) + Vite dev server
 yarn build && yarn start
 ```
 
+开发模式请访问 <http://localhost:5173>（`/api` 由 Vite 代理到 3013）；
+生产模式由 Express 托管 `dist/`，访问 3013 即可。
+
+### 启动参数
+
+`yarn start` / `yarn dev:server` 支持以下参数，优先级：CLI 参数 > 环境变量 > 默认值。
+
+| 参数 | 环境变量 | 默认值 | 说明 |
+|------|----------|--------|------|
+| `--host` | `HOST` | 绑定所有网卡 | 监听地址，例如 `--host=127.0.0.1` |
+| `--port` | `PORT` | `3013` | 监听端口（1-65535） |
+| — | `DIST_DIR` | `./dist` | 生产模式前端产物目录 |
+
+```bash
+yarn start --host=127.0.0.1 --port=8080
+yarn start --port 8080        # --key value 写法同样支持
+```
+
 ---
 
 ## 部署到 Vercel

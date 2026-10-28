@@ -10,6 +10,7 @@ import QRCode from 'qrcode'
 import jsQR from 'jsqr'
 import sharp from 'sharp'
 import Diff from 'diff'
+import { isProduction, distPath } from './env'
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js')
@@ -19,8 +20,9 @@ const app = express()
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-const distPath = path.join(__dirname, '../../dist')
-const shouldServeSpa = !process.env.VERCEL && fs.existsSync(path.join(distPath, 'index.html'))
+// 仅生产模式（yarn start）托管前端；开发模式的页面由 Vite dev server 提供
+const shouldServeSpa =
+  isProduction && !process.env.VERCEL && fs.existsSync(path.join(distPath, 'index.html'))
 
 // ── multer configs ────────────────────────────────────────────────────────────
 const pdfUpload = multer({
@@ -602,11 +604,15 @@ app.post('/api/img-from-base64', async (req, res) => {
   } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }) }
 })
 
-// 本地运行时的 SPA fallback（Vercel 由 vercel.json rewrites 处理）
+// 生产模式的 SPA fallback（Vercel 由 vercel.json rewrites 处理）
 if (shouldServeSpa) {
-  app.get('/{*path}', (_req, res) => {
+  app.get('/{*path}', (req, res, next) => {
+    // 未匹配的 API 请求保持 404，不要返回 HTML
+    if (!req.accepts('html')) return next()
     res.sendFile(path.join(distPath, 'index.html'))
   })
+} else if (isProduction && !process.env.VERCEL) {
+  console.warn('[server] 未找到 dist/index.html，请先执行 `yarn build`')
 }
 
 export default app

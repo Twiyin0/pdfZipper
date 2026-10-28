@@ -8,10 +8,10 @@
   },
   "scripts": {
     "dev": "concurrently -k -n server,client -c cyan,green \"yarn dev:server\" \"yarn dev:client\"",
-    "dev:server": "tsx watch server.ts",
+    "dev:server": "tsx watch server.ts --app-env=development",
     "dev:client": "vite",
     "build": "vite build",
-    "start": "tsx server.ts"
+    "start": "tsx server.ts --app-env=production"
   },
   "dependencies": {
     "archiver": "^7.0.1",
