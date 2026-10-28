@@ -111,14 +111,40 @@ async function imageToEmbeddable(pdf: PDFDocument, fileBuffer: Buffer, mimeType:
   return pdf.embedJpg(canvas.toBuffer('image/jpeg', { quality: 0.92 }))
 }
 
+// 逐页渲染的并发上限：同时渲染所有页会让大文档一次性占用大量内存（canvas + JPEG buffer）
+const RENDER_CONCURRENCY = 4
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let cursor = 0
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const index = cursor
+      cursor += 1
+      if (index >= items.length) return
+      results[index] = await fn(items[index], index)
+    }
+  })
+
+  await Promise.all(workers)
+  return results
+}
+
 // ── API: 压缩 ─────────────────────────────────────────────────────────────────
 async function compressByDPI(buf: Buffer, dpi: number, jpegQuality: number): Promise<Buffer> {
   const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise
   const total = pdfDoc.numPages
   const scale = dpi / 72
   const cf = new NodeCanvasFactory()
-  const jpgs = await Promise.all(
-    Array.from({ length: total }, async (_: unknown, i: number) => {
+  const jpgs = await mapWithConcurrency(
+    Array.from({ length: total }, (_: unknown, i: number) => i),
+    RENDER_CONCURRENCY,
+    async (i) => {
       const page = await pdfDoc.getPage(i + 1)
       const vp = page.getViewport({ scale })
       const w = Math.floor(vp.width), h = Math.floor(vp.height)
@@ -127,7 +153,7 @@ async function compressByDPI(buf: Buffer, dpi: number, jpegQuality: number): Pro
       const jpg = pair.canvas.toBuffer('image/jpeg', { quality: jpegQuality })
       cf.destroy(pair)
       return { jpg, w, h }
-    })
+    }
   )
   const outPdf = await PDFDocument.create()
   for (const { jpg, w, h } of jpgs) {

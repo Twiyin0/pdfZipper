@@ -69,6 +69,7 @@
               :viewport="viewport"
               :edits="edits"
               :selected-id="selectedId"
+              :scale="scale"
               @select="onSelectBlock"
             />
           </PdfPageCanvas>
