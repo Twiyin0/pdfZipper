@@ -23,12 +23,12 @@
         <span class="text-xs text-gray-500 tabular-nums">{{ currentPage + 1 }} / {{ pageCount }}</span>
         <button class="btn btn-gray !px-2 !py-1 text-xs" :disabled="currentPage >= pageCount - 1" @click="goPage(currentPage + 1)">下一页</button>
 
-        <select v-model.number="scale" class="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 bg-white dark:bg-gray-800">
-          <option :value="0.75">75%</option>
-          <option :value="1">100%</option>
-          <option :value="1.25">125%</option>
-          <option :value="1.5">150%</option>
-        </select>
+        <div class="flex items-center gap-1">
+          <button class="btn btn-gray !px-2 !py-1 text-xs" @click="zoomBy(-0.1)">−</button>
+          <span class="w-12 text-center text-xs text-gray-500 tabular-nums">{{ Math.round(scale * 100) }}%</span>
+          <button class="btn btn-gray !px-2 !py-1 text-xs" @click="zoomBy(0.1)">＋</button>
+          <button class="btn btn-gray !px-2 !py-1 text-xs" @click="fitWidth">适应</button>
+        </div>
 
         <div class="ml-auto flex items-center gap-2">
           <span class="text-xs text-gray-400">已改 {{ editCount }} 处</span>
@@ -41,8 +41,8 @@
         </div>
       </div>
 
-      <div class="flex gap-4 items-start">
-        <aside class="w-16 shrink-0 max-h-[70vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-1.5 space-y-1">
+      <div class="flex gap-4 items-stretch h-[70vh]">
+        <aside class="w-16 shrink-0 overflow-y-auto bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-1.5 space-y-1">
           <button
             v-for="n in pageCount"
             :key="n"
@@ -54,8 +54,11 @@
           >{{ n }}</button>
         </aside>
 
-        <div class="flex-1 min-w-0 overflow-auto bg-gray-100 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 max-h-[70vh]">
-          <div v-if="loading" class="text-sm text-gray-400 py-10 text-center">正在解析...</div>
+        <div
+          ref="scroller"
+          class="flex-1 min-w-0 overflow-auto bg-gray-100 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-start justify-center"
+        >
+          <div v-if="loading" class="w-full text-sm text-gray-400 py-10 text-center">正在解析...</div>
           <PdfPageCanvas
             v-else
             :pdf="pdf"
@@ -75,7 +78,7 @@
           </PdfPageCanvas>
         </div>
 
-        <aside class="w-72 shrink-0 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 max-h-[70vh] overflow-y-auto">
+        <aside class="w-80 shrink-0 overflow-y-auto bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4">
           <PdfEditPanel
             :entry="selectedEntry"
             :edits="edits"
@@ -149,7 +152,10 @@ const {
 } = usePdfEditor()
 
 const viewport = ref<Viewport | null>(null)
+const scroller = ref<HTMLElement | null>(null)
 const scale = ref(1)
+/** 首次渲染完成后自动按容器宽度适配一次 */
+const autoFitted = ref(false)
 const selectedId = ref<string | null>(null)
 /** 选中但尚未保存到修改清单的临时条目 */
 const draftSeed = ref<PdfEditEntry | null>(null)
@@ -188,6 +194,26 @@ function clearSelection() {
 
 function onReady(next: Viewport) {
   viewport.value = next
+  if (!autoFitted.value) {
+    autoFitted.value = true
+    // 首帧时父容器可能还没完成布局（clientWidth 为 0），延后一帧再适配
+    requestAnimationFrame(() => fitWidth())
+  }
+}
+
+function zoomBy(delta: number) {
+  scale.value = Math.min(2, Math.max(0.4, +(scale.value + delta).toFixed(2)))
+}
+
+/** 让页面宽度贴合可视区，避免出现横向滚动 */
+function fitWidth() {
+  const el = scroller.value
+  const vp = viewport.value
+  if (!el || !vp) return
+  const pageWidth = vp.width / scale.value
+  const available = el.clientWidth - 32
+  if (pageWidth <= 0 || available <= 0) return
+  scale.value = Math.min(2, Math.max(0.4, +(available / pageWidth).toFixed(3)))
 }
 
 function onCanvasClick(x: number, y: number) {

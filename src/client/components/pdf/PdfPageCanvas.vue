@@ -1,6 +1,6 @@
 <template>
   <div
-    class="relative inline-block select-none"
+    class="relative inline-block shrink-0 select-none overflow-hidden"
     :style="{ width: size.w + 'px', height: size.h + 'px' }"
   >
     <canvas
@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { PdfDocumentProxy, PdfPageProxy } from '../../utils/pdfText'
 
 const props = defineProps<{
@@ -70,10 +70,15 @@ function onClick(e: MouseEvent) {
   emit('click', e.clientX - rect.left, e.clientY - rect.top)
 }
 
+// watch 回调在 setup 阶段拿不到模板 ref（canvas 还未挂载），
+// 必须等挂载完成后再渲染第一页，否则画布会一直是 300x150 的默认尺寸。
+onMounted(() => {
+  void render()
+})
+
 watch(
   [() => props.pdf, () => props.pageIndex, () => props.scale],
   () => { void render() },
-  { immediate: true },
 )
 
 onBeforeUnmount(() => {

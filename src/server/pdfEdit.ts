@@ -54,13 +54,13 @@ const TEXT_LIMIT = 2000
 // 标准 Helvetica 只能编码 WinAnsi，遇到这类字符会直接抛错。
 const UNICODE_RE = /[^\x00-\xFF]/
 
-const CJK_FONT_PATH = path.join(__dirname, 'assets/fonts/NotoSansSC-Regular.woff')
+const CJK_FONT_PATH = path.join(__dirname, 'assets/fonts/NotoSansSC-Regular.ttf')
 let cjkFontBytes: Buffer | null = null
 
 function loadCjkFontBytes(): Buffer {
   if (!cjkFontBytes) {
     if (!fs.existsSync(CJK_FONT_PATH)) {
-      throw new Error('缺少中文字体 src/server/assets/fonts/NotoSansSC-Regular.woff')
+      throw new Error('缺少中文字体 src/server/assets/fonts/NotoSansSC-Regular.ttf')
     }
     cjkFontBytes = fs.readFileSync(CJK_FONT_PATH)
   }
