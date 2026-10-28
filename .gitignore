@@ -10,4 +10,5 @@ yarn.lock
 .yarn
 example/
 .claude/
+.vscode/
 dist/
