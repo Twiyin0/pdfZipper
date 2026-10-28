@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { icons } from '../utils/icons'
 
 const props = withDefaults(defineProps<{
   name: string
@@ -15,12 +16,6 @@ const props = withDefaults(defineProps<{
 }>(), {
   size: '1em',
 })
-
-const rawIcons = import.meta.glob('../../icon/*.svg', {
-  query: '?raw',
-  import: 'default',
-  eager: true,
-}) as Record<string, string>
 
 function normalizeSvg(raw: string) {
   const cleaned = raw
@@ -39,8 +34,12 @@ function normalizeSvg(raw: string) {
 }
 
 const markup = computed(() => {
-  const raw = rawIcons[`../../icon/${props.name}.svg`]
-  return raw ? normalizeSvg(raw) : ''
+  const raw = icons[props.name]
+  if (!raw) {
+    if (import.meta.env.DEV) console.warn(`[SvgIcon] 未注册的图标：${props.name}`)
+    return ''
+  }
+  return normalizeSvg(raw)
 })
 
 const sizeStyle = computed(() => ({
