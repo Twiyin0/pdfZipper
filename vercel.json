@@ -5,7 +5,7 @@
       "src": "api/index.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["node_modules/pdfjs-dist/legacy/build/pdf.worker.js"]
+        "includeFiles": ["node_modules/pdfjs-dist/legacy/build/pdf.worker.js", "src/server/assets/fonts/**"]
       }
     },
     { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }

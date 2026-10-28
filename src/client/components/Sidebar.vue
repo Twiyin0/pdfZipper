@@ -44,6 +44,7 @@ const navGroups = [
       { path: '/pdf/split',          icon: 'scissors', label: '拆分' },
       { path: '/pdf/rotate',         icon: 'rotate-cw', label: '旋转' },
       { path: '/pdf/pages',          icon: 'files-alt', label: '页面管理' },
+      { path: '/pdf/edit',           icon: 'pen', label: 'PDF 编辑器' },
       { path: '/pdf/compare',        icon: 'search', label: 'PDF 比对' },
       { path: '/convert/img-to-pdf', icon: 'image', label: '图转 PDF' },
       { path: '/convert/pdf-to-img', icon: 'camera', label: 'PDF 转图' },
