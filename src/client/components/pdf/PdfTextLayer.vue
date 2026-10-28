@@ -110,7 +110,9 @@ function previewStyle(id: string, rect: PdfRect) {
     lineHeight: `${box.height}px`,
     color: `rgb(${Math.round(entry.color.r * 255)}, ${Math.round(entry.color.g * 255)}, ${Math.round(entry.color.b * 255)})`,
     textAlign: entry.align,
-    fontFamily: "'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: entry.fontFamily === 'serif'
+      ? "'Noto Serif SC', 'Songti SC', SimSun, serif"
+      : "'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     background: entry.mode === 'insert' ? 'transparent' : 'rgba(255, 255, 255, 0.92)',
   }
 }

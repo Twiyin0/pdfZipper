@@ -9,10 +9,14 @@ export const DESCENT_RATIO = 0.25
 
 export interface PdfRect { x: number; y: number; w: number; h: number }
 
+/** 字体类别：只区分衬线 / 无衬线，用于近似匹配原字体 */
+export type FontFamily = 'serif' | 'sans'
+
 export interface PdfTextRun {
   text: string
   rect: PdfRect
   fontSize: number
+  fontFamily: FontFamily
 }
 
 export interface PdfTextBlock {
@@ -21,6 +25,8 @@ export interface PdfTextBlock {
   text: string
   rect: PdfRect
   fontSize: number
+  /** 原文字的字体类别（来自 pdfjs styles） */
+  fontFamily: FontFamily
   runs: PdfTextRun[]
 }
 
@@ -32,19 +38,34 @@ interface RawTextItem {
   width: number
   height: number
   transform: number[]
+  fontName?: string
+}
+
+interface RawTextStyle {
+  fontFamily?: string
+}
+
+/**
+ * pdfjs 会把字体归一成 serif / sans-serif / monospace，
+ * 这里只取衬线与否，作为匹配内置字体的依据。
+ */
+function familyOf(fontName: string | undefined, styles: Record<string, RawTextStyle>): FontFamily {
+  const raw = fontName ? styles[fontName]?.fontFamily ?? '' : ''
+  return /serif/i.test(raw) && !/sans/i.test(raw) ? 'serif' : 'sans'
 }
 
 export function loadPdfDocument(data: ArrayBuffer): Promise<PdfDocumentProxy> {
   return pdfjsLib.getDocument({ data }).promise
 }
 
-function toRun(item: RawTextItem): PdfTextRun {
+function toRun(item: RawTextItem, styles: Record<string, RawTextStyle>): PdfTextRun {
   const fontSize =
     Math.hypot(item.transform[2], item.transform[3]) || Math.abs(item.transform[3]) || 12
 
   return {
     text: item.str,
     fontSize,
+    fontFamily: familyOf(item.fontName, styles),
     rect: {
       x: item.transform[4],
       y: item.transform[5] - fontSize * DESCENT_RATIO,
@@ -95,11 +116,18 @@ function mergeRuns(runs: PdfTextRun[], pageIndex: number): PdfTextBlock[] {
     const bottom = Math.min(...line.map((r) => r.rect.y))
     const top = Math.max(...line.map((r) => r.rect.y + r.rect.h))
 
+    const familyCounts = new Map<FontFamily, number>()
+    for (const run of line) {
+      familyCounts.set(run.fontFamily, (familyCounts.get(run.fontFamily) ?? 0) + 1)
+    }
+    const fontFamily = [...familyCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+
     return {
       id: `${pageIndex}-${index}`,
       page: pageIndex,
       text,
       fontSize: Math.max(...line.map((r) => r.fontSize)),
+      fontFamily,
       rect: { x: left, y: bottom, w: Math.max(right - left, 1), h: Math.max(top - bottom, 1) },
       runs: line,
     }
@@ -110,10 +138,11 @@ export async function extractPageBlocks(
   page: PdfPageProxy,
   pageIndex: number,
 ): Promise<PdfTextBlock[]> {
-  const { items } = await page.getTextContent()
+  const { items, styles } = await page.getTextContent()
+  const styleMap = (styles ?? {}) as Record<string, RawTextStyle>
   const runs = (items as RawTextItem[])
     .filter((item) => item.str && item.str.trim())
-    .map(toRun)
+    .map((item) => toRun(item, styleMap))
 
   return mergeRuns(runs, pageIndex)
 }

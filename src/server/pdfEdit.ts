@@ -15,6 +15,9 @@ export const DESCENT_RATIO = 0.25
 export interface EditRect { x: number; y: number; w: number; h: number }
 export interface RGBColor { r: number; g: number; b: number }
 
+/** 字体类别：按原文字体特征选择内置字体 */
+export type FontFamily = 'serif' | 'sans'
+
 export type EditMode = 'replace' | 'delete' | 'insert'
 
 export interface TextEdit {
@@ -26,7 +29,10 @@ export interface TextEdit {
   text?: string
   fontSize?: number
   color?: RGBColor
+  /** 字体偏好；serif 对应宋体风格，sans 对应黑体风格 */
   font?: 'auto' | 'latin' | 'cjk'
+  /** 字体类别，默认 sans；前端会按原文字体自动带上 */
+  fontFamily?: FontFamily
   align?: 'left' | 'center' | 'right'
   /** 新文字超出原宽度时自动缩小字号（默认 true） */
   fitToWidth?: boolean
@@ -54,17 +60,22 @@ const TEXT_LIMIT = 2000
 // 标准 Helvetica 只能编码 WinAnsi，遇到这类字符会直接抛错。
 const UNICODE_RE = /[^\x00-\xFF]/
 
-const CJK_FONT_PATH = path.join(__dirname, 'assets/fonts/NotoSansSC-Regular.ttf')
-let cjkFontBytes: Buffer | null = null
+const FONT_FILES: Record<FontFamily, string> = {
+  sans: path.join(__dirname, 'assets/fonts/NotoSansSC-Regular.ttf'),
+  serif: path.join(__dirname, 'assets/fonts/NotoSerifSC-Regular.ttf'),
+}
+const fontBytesCache = new Map<FontFamily, Buffer>()
 
-function loadCjkFontBytes(): Buffer {
-  if (!cjkFontBytes) {
-    if (!fs.existsSync(CJK_FONT_PATH)) {
-      throw new Error('缺少中文字体 src/server/assets/fonts/NotoSansSC-Regular.ttf')
-    }
-    cjkFontBytes = fs.readFileSync(CJK_FONT_PATH)
-  }
-  return cjkFontBytes
+function loadFontBytes(family: FontFamily): Buffer {
+  const cached = fontBytesCache.get(family)
+  if (cached) return cached
+
+  const file = FONT_FILES[family]
+  if (!fs.existsSync(file)) throw new Error(`缺少中文字体 ${file}`)
+
+  const bytes = fs.readFileSync(file)
+  fontBytesCache.set(family, bytes)
+  return bytes
 }
 
 export function hasCjk(text: string): boolean {
@@ -202,18 +213,26 @@ async function createBackgroundSampler(pdfBytes: Buffer): Promise<BackgroundSamp
 }
 
 
+function resolveFamily(requested: TextEdit['fontFamily']): FontFamily {
+  return requested === 'serif' ? 'serif' : 'sans'
+}
+
 function pickFont(
   text: string,
   preference: TextEdit['font'],
-  latin: PDFFont,
-  cjk: PDFFont | null,
+  family: FontFamily,
+  latinFonts: Record<FontFamily, PDFFont>,
+  cjkFonts: Partial<Record<FontFamily, PDFFont>>,
 ): PDFFont {
-  if (preference === 'latin') return latin
+  if (preference === 'latin' && !hasCjk(text)) return latinFonts[family]
+
   if (preference === 'cjk' || hasCjk(text)) {
-    if (!cjk) throw new Error('缺少中文字体，无法写入中文')
-    return cjk
+    const font = cjkFonts[family]
+    if (!font) throw new Error('缺少中文字体，无法写入中文')
+    return font
   }
-  return latin
+
+  return latinFonts[family]
 }
 
 /**
@@ -241,9 +260,24 @@ export async function applyTextEdits(
   const minFontSize = clamp(options.minFontSize ?? 6, 1, 200)
   const maxFontSize = clamp(options.maxFontSize ?? 72, 1, 200)
 
-  const latinFont = await doc.embedFont(StandardFonts.Helvetica)
-  const needCjk = items.some((item) => hasCjk(item.text))
-  const cjkFont = needCjk ? await doc.embedFont(loadCjkFontBytes(), { subset: true }) : null
+  // 英文用标准字体按类别匹配：sans → Helvetica，serif → Times
+  const latinFonts: Record<FontFamily, PDFFont> = {
+    sans: await doc.embedFont(StandardFonts.Helvetica),
+    serif: await doc.embedFont(StandardFonts.TimesRoman),
+  }
+
+  // 只加载实际用到的中文字体（按字体类别）
+  const families = new Set<FontFamily>()
+  for (const item of items) {
+    if (item.mode !== 'delete') families.add(resolveFamily(item.raw.fontFamily))
+  }
+
+  const cjkFonts: Partial<Record<FontFamily, PDFFont>> = {}
+  if (items.some((item) => item.mode !== 'delete' && hasCjk(item.text))) {
+    for (const family of families) {
+      cjkFonts[family] = await doc.embedFont(loadFontBytes(family), { subset: true })
+    }
+  }
 
   const needSampler = items.some(
     (item) => item.mode !== 'insert' && item.raw.cover !== false && item.raw.coverColor === 'auto',
@@ -265,7 +299,7 @@ export async function applyTextEdits(
     if (mode !== 'delete') {
       try {
         const baseSize = clamp(raw.fontSize ?? 12, 1, 200)
-        const picked = pickFont(text, raw.font, latinFont, cjkFont)
+        const picked = pickFont(text, raw.font, resolveFamily(raw.fontFamily), latinFonts, cjkFonts)
         size = baseSize
 
         if (raw.fitToWidth !== false && rect.w > 0) {

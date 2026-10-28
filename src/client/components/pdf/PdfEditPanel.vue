@@ -28,6 +28,21 @@
         </div>
       </div>
 
+      <div>
+        <label class="form-label">字体（默认跟随原文字体）</label>
+        <div class="flex gap-1.5">
+          <button
+            v-for="option in fontOptions"
+            :key="option.value"
+            class="flex-1 py-1.5 rounded-lg border text-xs font-semibold transition-colors"
+            :class="draft.fontFamily === option.value
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+              : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'"
+            @click="draft.fontFamily = option.value"
+          >{{ option.label }}</button>
+        </div>
+      </div>
+
       <div class="flex gap-1.5">
         <button
           v-for="option in aligns"
@@ -114,6 +129,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { EditAlign, EditColor, PdfEditEntry } from '../../composables/usePdfEditor'
+import type { FontFamily } from '../../utils/pdfText'
 
 const props = defineProps<{
   entry: PdfEditEntry | null
@@ -136,6 +152,11 @@ const aligns: Array<{ value: EditAlign; label: string }> = [
   { value: 'left', label: '左对齐' },
   { value: 'center', label: '居中' },
   { value: 'right', label: '右对齐' },
+]
+
+const fontOptions: Array<{ value: FontFamily; label: string }> = [
+  { value: 'sans', label: '黑体 / 无衬线' },
+  { value: 'serif', label: '宋体 / 衬线' },
 ]
 
 const draft = ref<PdfEditEntry | null>(null)

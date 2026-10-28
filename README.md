@@ -45,6 +45,7 @@
 
 - 基于「背景覆盖 + 重新绘制」：先用背景色遮住原文字，再按原基线绘制新文字
 - 支持替换 / 删除 / 新增，可调字号、颜色、对齐，超出原宽度时自动缩小
+- 字体自适应：读取原文的衬线 / 无衬线特征，自动匹配内置黑体或宋体，也可手动切换
 - 覆盖色默认从页面渲染结果自动采样，适配非纯白背景
 - 限制：原文字仍保留在 PDF 文本层中（可能被搜索或复制到）；扫描件（无文本层）不支持
 - 中文使用内置 Noto Sans SC 子集，导出时按实际用字做字体子集化，文件不会明显变大
@@ -56,7 +57,7 @@
 - **前端：** Vue 3 + Vue Router + Pinia + Tailwind CSS + TypeScript
 - **后端：** Node.js 20 + Express 5 + TypeScript
 - **构建：** Vite 6（前端）+ tsx（后端开发/运行）
-- **PDF 处理：** pdf-lib · pdfjs-dist@2.16.105 · @pdf-lib/fontkit（文字编辑嵌入 Noto Sans SC）
+- **PDF 处理：** pdf-lib · pdfjs-dist@2.16.105 · @pdf-lib/fontkit（文字编辑嵌入 Noto Sans / Serif SC）
 - **图片处理：** sharp · canvas
 - **其他：** qrcode · jsqr · archiver · multer · diff
 - **部署：** Vercel（Serverless Functions + CDN 静态托管）

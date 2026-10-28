@@ -5,6 +5,7 @@ import {
   type PdfDocumentProxy,
   type PdfTextBlock,
   type PdfRect,
+  type FontFamily,
 } from '../utils/pdfText'
 
 export type EditMode = 'replace' | 'delete' | 'insert'
@@ -20,6 +21,8 @@ export interface PdfEditEntry {
   original?: string
   text: string
   fontSize: number
+  /** 字体类别，默认跟随原文字体 */
+  fontFamily: FontFamily
   color: EditColor
   align: EditAlign
   fitToWidth: boolean
@@ -175,6 +178,7 @@ export function usePdfEditor() {
       },
       text: '',
       fontSize,
+      fontFamily: 'sans',
       color: { r: 0, g: 0, b: 0 },
       align: 'left',
       fitToWidth: false,
@@ -198,6 +202,7 @@ export function usePdfEditor() {
       original: block.text,
       text: block.text,
       fontSize: Math.round(block.fontSize * 100) / 100,
+      fontFamily: block.fontFamily,
       color: { r: 0, g: 0, b: 0 },
       align: 'left',
       fitToWidth: true,
