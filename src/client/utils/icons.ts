@@ -21,7 +21,6 @@ import i18 from '../../icon/image.svg?raw'
 import i19 from '../../icon/link.svg?raw'
 import i20 from '../../icon/menu.svg?raw'
 import i21 from '../../icon/moon.svg?raw'
-import i22 from '../../icon/pen.svg?raw'
 import i23 from '../../icon/plus.svg?raw'
 import i24 from '../../icon/refresh-cw.svg?raw'
 import i25 from '../../icon/rotate-cw.svg?raw'
@@ -54,7 +53,6 @@ export const icons: Record<string, string> = {
   'link': i19,
   'menu': i20,
   'moon': i21,
-  'pen': i22,
   'plus': i23,
   'refresh-cw': i24,
   'rotate-cw': i25,

@@ -10,7 +10,6 @@ import QRCode from 'qrcode'
 import jsQR from 'jsqr'
 import sharp from 'sharp'
 import Diff from 'diff'
-import { applyTextEdits, type ApplyOptions } from './pdfEdit'
 import { isProduction, distPath } from './env'
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -628,37 +627,6 @@ app.post('/api/img-from-base64', async (req, res) => {
     }
     const ext = extMap[m[1]] || 'png'
     res.json({ success: true, ext, size: buf.length, file: b64File(buf, m[1], `decoded_image.${ext}`) })
-  } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }) }
-})
-
-app.post('/api/pdf-edit/apply', pdfUpload.single('pdf'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: '请上传 PDF 文件' })
-
-  let edits: unknown
-  let options: ApplyOptions = {}
-  try {
-    edits = JSON.parse(req.body.edits || '[]')
-    if (req.body.options) options = JSON.parse(req.body.options)
-  } catch {
-    return res.status(400).json({ error: 'edits / options 不是合法 JSON' })
-  }
-
-  if (!Array.isArray(edits) || !edits.length) {
-    return res.status(400).json({ error: '没有需要应用的修改' })
-  }
-  if (edits.length > 500) {
-    return res.status(400).json({ error: '单次最多应用 500 处修改' })
-  }
-
-  try {
-    const { buffer, pageCount, applied, skipped } = await applyTextEdits(req.file.buffer, edits, options)
-    if (!applied) return res.status(400).json({ error: '没有可应用的修改' })
-
-    const base = origName(req.file).replace(/\.pdf$/i, '')
-    res.json({
-      success: true, pageCount, applied, skipped, size: buffer.length,
-      file: b64File(buffer, 'application/pdf', `${base}_edited.pdf`),
-    })
   } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }) }
 })
 

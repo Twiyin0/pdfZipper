@@ -9,7 +9,6 @@ const router = createRouter({
     { path: '/pdf/split',       component: () => import('../views/pdf/PdfSplit.vue') },
     { path: '/pdf/rotate',      component: () => import('../views/pdf/PdfRotate.vue') },
     { path: '/pdf/pages',       component: () => import('../views/pdf/PdfPages.vue') },
-    { path: '/pdf/edit',        component: () => import('../views/pdf/PdfEdit.vue') },
     { path: '/pdf/compare',     component: () => import('../views/pdf/PdfCompare.vue') },
     { path: '/convert/img-to-pdf', component: () => import('../views/convert/ImgToPdf.vue') },
     { path: '/convert/pdf-to-img', component: () => import('../views/convert/PdfToImg.vue') },
