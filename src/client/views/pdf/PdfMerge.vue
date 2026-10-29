@@ -1,5 +1,5 @@
 <template>
-  <div class="card">
+  <div class="card card-wide">
     <h1 class="text-xl font-bold mb-1">PDF 合并</h1>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">上传多个 PDF 文件，拖拽调整顺序，合并为一个文件</p>
 
@@ -30,7 +30,7 @@
       />
     </div>
 
-    <p v-if="files.length > 1" class="text-xs text-gray-400 text-center mt-2">拖拽文件名可调整合并顺序</p>
+    <p v-if="files.length > 1" class="text-xs text-gray-400 text-center mt-2">拖拽文件名可调整文件顺序</p>
 
     <div v-if="files.length" class="mt-3">
       <button
@@ -43,6 +43,20 @@
           继续添加 PDF
         </span>
       </button>
+    </div>
+
+    <div v-if="files.length" class="mt-5">
+      <div class="section-title">页面顺序（合并结果顺序）</div>
+      <PageThumbnailGrid
+        :pages="pages"
+        :loading="thumbLoading"
+        :show-original-no="false"
+        hint="拖拽缩略图可调整页面在合并结果中的先后顺序"
+        @reorder="onReorder"
+      />
+      <p v-if="renderedCount < pageTotal && pageTotal" class="text-xs text-gray-400 mt-1">
+        共 {{ pageTotal }} 页，其中 {{ renderedCount }} 页已生成预览（其余页面未生成预览，但仍按顺序参与合并）
+      </p>
     </div>
 
     <div v-if="files.length" class="mt-5">
@@ -62,7 +76,7 @@
     </div>
 
     <button class="btn btn-primary" :disabled="files.length < 2 || loading" @click="merge">
-      {{ loading ? '合并中...' : files.length >= 2 ? `合并 ${files.length} 个 PDF` : '请先添加至少两个 PDF' }}
+      {{ loading ? '合并中...' : files.length >= 2 ? `合并 ${files.length} 个 PDF（${pageTotal} 页）` : '请先添加至少两个 PDF' }}
     </button>
 
     <ProgressBar :show="loading" :progress="progress" :text="progressText" />
@@ -94,19 +108,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
+import PageThumbnailGrid from '../../components/PageThumbnailGrid.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
 import ResultBox from '../../components/ResultBox.vue'
 import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
+import { fetchThumbnails, THUMB_MIN_PER_FILE, THUMB_PAGE_LIMIT, THUMB_TOTAL_BUDGET, type ThumbPage } from '../../utils/pdfThumbs'
 import { useToast } from '../../composables/useToast'
 
 const { show: showToast } = useToast()
 
-interface FileEntry { file: File; id: string }
+interface FileEntry { file: File; id: string; pages: ThumbPage[] }
 const files = ref<FileEntry[]>([])
+/** 展平后的页面顺序，即合并结果中的页面顺序 */
+const pages = ref<ThumbPage[]>([])
+const pendingThumbs = ref(0)
+const thumbLoading = computed(() => pendingThumbs.value > 0)
+const pageTotal = computed(() => files.value.reduce((n, f) => n + f.pages.length, 0))
+/** 实际生成了缩略图的页数（其余为未生成预览的占位项） */
+const renderedCount = computed(() => pages.value.filter(p => p.data).length)
 const dragSrc = ref<string | null>(null)
 const dragTarget = ref<string | null>(null)
 const selectedSize = ref('original')
@@ -129,16 +152,76 @@ const sizes = [
 
 function uid() { return Math.random().toString(36).slice(2) }
 
-function addFiles(newFiles: File[]) {
+function fileMeta(item: FileEntry) {
+  const size = fmtSize(item.file.size)
+  return item.pages.length ? `${size} · ${item.pages.length} 页` : size
+}
+
+async function addFiles(newFiles: File[]) {
+  const accepted: File[] = []
   for (const f of newFiles) {
     if (f.type !== 'application/pdf') { showToast(`${f.name} 不是 PDF，已跳过`); continue }
-    files.value.push({ file: f, id: uid() })
+    accepted.push(f)
   }
+  if (!accepted.length) return
   result.value = null
+  for (const f of accepted) {
+    const id = uid()
+    files.value.push({ file: f, id, pages: [] })
+    void loadThumbs(id, f)
+  }
+}
+
+/** 加载单个文件的缩略图 */
+async function loadThumbs(id: string, file: File) {
+  pendingThumbs.value += 1
+  try {
+    // 多文件时按总预算均分预览额度，但每份文件至少保留 THUMB_MIN_PER_FILE 页，
+    // 且不超过单文件上限 THUMB_PAGE_LIMIT（避免大文档出现大片未生成预览的占位格）
+    const share = Math.floor(THUMB_TOTAL_BUDGET / Math.max(1, files.value.length))
+    const limit = Math.min(THUMB_PAGE_LIMIT, Math.max(THUMB_MIN_PER_FILE, share))
+    const { pages: filePages } = await fetchThumbnails(file, { limit, group: id, label: file.name })
+    const entry = files.value.find(x => x.id === id)
+    if (!entry) return
+    // 多文件场景下页码只在文件内有意义，标签带上文件名避免歧义
+    filePages.forEach(p => { p.label = `${file.name} · 第${p.page}页` })
+    entry.pages = filePages
+    insertPages(id, filePages)
+  } catch (e: unknown) {
+    showToast(`${file.name} 缩略图生成失败：${(e as Error).message}`)
+  } finally {
+    pendingThumbs.value -= 1
+  }
+}
+
+/** 把某文件的页面插入到展平列表中它应在的位置（按文件顺序） */
+function insertPages(id: string, filePages: ThumbPage[]) {
+  const order = files.value.map(f => f.id)
+  const pos = order.indexOf(id)
+  const before = new Set(order.slice(0, pos))
+  let insertAt = 0
+  for (let i = 0; i < pages.value.length; i++) {
+    if (before.has(pages.value[i].group ?? '')) insertAt = i + 1
+  }
+  pages.value.splice(insertAt, 0, ...filePages)
+}
+
+/** 文件顺序变化后按新顺序重排页面（文件内相对顺序保持不变） */
+function regroupPages() {
+  const rank = new Map(files.value.map((f, i) => [f.id, i]))
+  pages.value = pages.value
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => {
+      const ra = rank.get(a.p.group ?? '') ?? 0
+      const rb = rank.get(b.p.group ?? '') ?? 0
+      return ra === rb ? a.i - b.i : ra - rb
+    })
+    .map(x => x.p)
 }
 
 function removeFile(id: string) {
   files.value = files.value.filter(f => f.id !== id)
+  pages.value = pages.value.filter(p => p.group !== id)
 }
 
 function onAddMore(e: Event) {
@@ -154,9 +237,14 @@ function onDrop(id: string) {
   const srcIdx = files.value.findIndex(f => f.id === dragSrc.value)
   const dstIdx = files.value.findIndex(f => f.id === id)
   const [moved] = files.value.splice(srcIdx, 1)
-  files.value.splice(dstIdx, 0, moved)
+  let insert = dstIdx
+  if (srcIdx < insert) insert -= 1
+  files.value.splice(insert, 0, moved)
   dragTarget.value = null
+  regroupPages()
 }
+
+function onReorder(list: ThumbPage[]) { pages.value = list }
 
 async function merge() {
   if (files.value.length < 2) return
@@ -166,6 +254,18 @@ async function merge() {
   files.value.forEach(({ file }) => fd.append('pdfs', file))
   fd.append('order', JSON.stringify(files.value.map((_, i) => i)))
   fd.append('paperSize', selectedSize.value)
+
+  // 页面级顺序：所有文件的页面都已加载预览时才发送，否则退回按文件顺序合并
+  const fileIndex = new Map(files.value.map((f, i) => [f.id, i]))
+  const allLoaded = files.value.every(f => f.pages.length > 0)
+  if (allLoaded && pages.value.length) {
+    const pageOrder = pages.value.map(p => {
+      const f = p.group === undefined ? undefined : fileIndex.get(p.group)
+      return f === undefined ? null : { f, p: p.page }
+    }).filter((x): x is { f: number; p: number } => x !== null)
+    if (pageOrder.length) fd.append('pageOrder', JSON.stringify(pageOrder))
+  }
+
   const timer = setInterval(() => { if (progress.value < 85) progress.value += 3 }, 100)
   progressText.value = '正在合并页面...'
   try {

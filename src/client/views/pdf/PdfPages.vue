@@ -1,10 +1,25 @@
 <template>
-  <div class="card">
+  <div class="card card-wide">
     <h1 class="text-xl font-bold mb-1">PDF 页面管理</h1>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">删除或提取 PDF 中的指定页面</p>
 
     <DropZone v-if="!file" accept=".pdf,application/pdf" icon="files-alt" text="点击选择或拖拽 PDF 文件" hint="最大支持 200 MB" @files="onFiles" />
     <FileItem v-else :name="file.name" :meta="`${fmtSize(file.size)}${totalPages ? ' · ' + totalPages + ' 页' : ''}`" @remove="clearFile" />
+
+    <div v-if="file" class="mt-5">
+      <div class="section-title">页面预览</div>
+      <PageThumbnailGrid
+        :pages="pageList"
+        :loading="thumbLoading"
+        :selected="selectedPositions"
+        hint="点击缩略图可选中/取消页面；拖拽缩略图可调整页面顺序，结果按此顺序输出"
+        @reorder="onReorder"
+        @toggle="togglePage"
+      />
+      <p v-if="pageList.length && renderedCount < totalPages" class="text-xs text-gray-400 mt-1">
+        共 {{ totalPages }} 页，其中 {{ renderedCount }} 页已生成预览（未生成预览的页面仍参与处理）
+      </p>
+    </div>
 
     <div class="mt-5">
       <div class="section-title">操作类型</div>
@@ -23,7 +38,7 @@
       <div>
         <label class="form-label">{{ operation === 'remove' ? '要删除的页码' : '要提取的页码' }}</label>
         <input v-model="pages" class="form-input" :placeholder="totalPages ? (operation === 'remove' ? `例如：1, 3, 5-8（共 ${totalPages} 页）` : `例如：1-3, 5, 7-9（共 ${totalPages} 页）`) : (operation === 'remove' ? '例如：1, 3, 5-8（1-based）' : '例如：1-3, 5, 7-9（1-based）')" />
-        <p class="text-xs text-gray-400 mt-1">支持范围格式，如 1-3, 5, 7-9。支持中文标点：，｜－</p>
+        <p class="text-xs text-gray-400 mt-1">支持范围格式，如 1-3, 5, 7-9。支持中文标点：，｜－。页码按上方缩略图的当前顺序计算</p>
       </div>
     </div>
 
@@ -59,18 +74,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import DropZone from '../../components/DropZone.vue'
 import FileItem from '../../components/FileItem.vue'
+import PageThumbnailGrid from '../../components/PageThumbnailGrid.vue'
 import ProgressBar from '../../components/ProgressBar.vue'
 import ResultBox from '../../components/ResultBox.vue'
 import SvgIcon from '../../components/SvgIcon.vue'
 import { downloadFile, fmtSize } from '../../utils/download'
+import { fetchThumbnails, parsePageList, type ThumbPage } from '../../utils/pdfThumbs'
 import { useToast } from '../../composables/useToast'
 
 const { show: showToast } = useToast()
 const file = ref<File | null>(null)
 const totalPages = ref(0)
+/** 页面顺序（拖拽可调整），处理结果按此顺序输出 */
+const pageList = ref<ThumbPage[]>([])
+const thumbLoading = ref(false)
+/** 实际生成了缩略图的页数（其余为未生成预览的占位项） */
+const renderedCount = computed(() => pageList.value.filter(p => p.data).length)
 const operation = ref('remove')
 const pages = ref('')
 const loading = ref(false)
@@ -83,15 +105,36 @@ const ops = [
   { value: 'extract', label: '提取页面' },
 ]
 
-function onFiles(files: File[]) {
+/** 已选位置（按当前缩略图顺序，1-based） */
+const selectedPositions = computed(() =>
+  pages.value.trim() ? parsePageList(pages.value, pageList.value.length) : [])
+
+async function onFiles(files: File[]) {
   const f = files[0]
   if (f.type !== 'application/pdf') { showToast('请选择 PDF 文件'); return }
-  file.value = f; result.value = null; totalPages.value = 0
-  const fd = new FormData(); fd.append('pdf', f)
-  fetch('/api/pdf-info', { method: 'POST', body: fd })
-    .then(r => r.json()).then(d => { if (d.success) totalPages.value = d.pageCount }).catch(() => {})
+  file.value = f; result.value = null; totalPages.value = 0; pageList.value = []
+  thumbLoading.value = true
+  try {
+    const res = await fetchThumbnails(f)
+    pageList.value = res.pages
+    totalPages.value = res.pageCount
+  } catch (e: unknown) {
+    showToast(`缩略图生成失败：${(e as Error).message}`)
+  } finally {
+    thumbLoading.value = false
+  }
 }
-function clearFile() { file.value = null; result.value = null; totalPages.value = 0 }
+function clearFile() { file.value = null; result.value = null; totalPages.value = 0; pageList.value = [] }
+function onReorder(list: ThumbPage[]) { pageList.value = list }
+
+/** 点击缩略图：切换该位置在页码输入框中的选中状态 */
+function togglePage(position: number) {
+  const current = parsePageList(pages.value, pageList.value.length)
+  const next = current.includes(position)
+    ? current.filter(p => p !== position)
+    : [...current, position].sort((a, b) => a - b)
+  pages.value = next.join(', ')
+}
 
 async function process() {
   if (!file.value || !pages.value.trim()) return
@@ -100,6 +143,7 @@ async function process() {
   const fd = new FormData()
   fd.append('pdf', file.value)
   fd.append('pages', pages.value)
+  if (pageList.value.length) fd.append('order', JSON.stringify(pageList.value.map(p => p.page)))
   const endpoint = operation.value === 'remove' ? '/api/remove-pages' : '/api/extract-pages'
   const timer = setInterval(() => { if (progress.value < 85) progress.value += 5 }, 100)
   try {

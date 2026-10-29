@@ -16,6 +16,24 @@ import { isProduction, distPath } from './env'
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js')
 pdfjsLib.GlobalWorkerOptions.workerSrc = null
 
+// pdf.js 在 Node 下通过 fs 读取标准字体与 CMap 资源，必须显式给出目录，否则
+// 未嵌入字体的 PDF（标准 14 字体）渲染时会丢失全部文字，缩略图/转图/压缩均受影响。
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfjsDistDir = path.dirname(require.resolve('pdfjs-dist/package.json'))
+const PDFJS_STANDARD_FONT_URL = path.join(pdfjsDistDir, 'standard_fonts') + path.sep
+const PDFJS_CMAP_URL = path.join(pdfjsDistDir, 'cmaps') + path.sep
+
+/** pdf.js 文档加载参数：统一带上标准字体与 CMap 资源 */
+function pdfjsLoadOptions(data: Buffer) {
+  return {
+    data: new Uint8Array(data),
+    verbosity: 0,
+    standardFontDataUrl: PDFJS_STANDARD_FONT_URL,
+    cMapUrl: PDFJS_CMAP_URL,
+    cMapPacked: true,
+  }
+}
+
 const app = express()
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
@@ -101,6 +119,28 @@ function parseRanges(rangesStr: string, total: number): [number, number][] {
     })
 }
 
+// 前端拖拽后的页面顺序：原始页号数组（1-based）。
+// 缺失或非法时回退为原始顺序，保证后端始终拿到完整的一一对应。
+function parseOrder(raw: unknown, total: number): number[] {
+  const fallback = Array.from({ length: total }, (_, i) => i + 1)
+  if (typeof raw !== 'string' || !raw.trim()) return fallback
+  try {
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr) || arr.length !== total) return fallback
+    const seen = new Set<number>()
+    const out: number[] = []
+    for (const v of arr) {
+      const n = Number(v)
+      if (!Number.isInteger(n) || n < 1 || n > total || seen.has(n)) return fallback
+      seen.add(n)
+      out.push(n)
+    }
+    return out
+  } catch { return fallback }
+}
+
+const isIdentityOrder = (order: number[]) => order.every((n, i) => n === i + 1)
+
 async function imageToEmbeddable(pdf: PDFDocument, fileBuffer: Buffer, mimeType: string) {
   if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') return pdf.embedJpg(fileBuffer)
   if (mimeType === 'image/png') return pdf.embedPng(fileBuffer)
@@ -136,7 +176,7 @@ async function mapWithConcurrency<T, R>(
 
 // ── API: 压缩 ─────────────────────────────────────────────────────────────────
 async function compressByDPI(buf: Buffer, dpi: number, jpegQuality: number): Promise<Buffer> {
-  const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise
+  const pdfDoc = await pdfjsLib.getDocument(pdfjsLoadOptions(buf)).promise
   const total = pdfDoc.numPages
   const scale = dpi / 72
   const cf = new NodeCanvasFactory()
@@ -214,33 +254,62 @@ app.post('/api/merge', pdfUpload.array('pdfs', 20), async (req, res) => {
     const paperSize = (req.body.paperSize || 'original').toLowerCase()
     const targetDims = PAPER_SIZES[paperSize]
     const merged = await PDFDocument.create()
-    for (const idx of indices) {
-      const src = await PDFDocument.load(files[idx].buffer)
-      if (!targetDims) {
-        const pages = await merged.copyPages(src, src.getPageIndices())
-        pages.forEach(p => merged.addPage(p))
-      } else {
-        const copiedPages = await merged.copyPages(src, src.getPageIndices())
-        for (let i = 0; i < copiedPages.length; i++) {
-          const srcPage = copiedPages[i]
-          const { width: sw, height: sh } = srcPage.getSize()
-          const landscape = sw > sh
-          const [pw, ph] = landscape ? [targetDims[1], targetDims[0]] : targetDims
-          const scale = Math.min(pw / sw, ph / sh)
-          const dw = sw * scale, dh = sh * scale
-          const newPage = merged.addPage([pw, ph])
 
-          // Check if page has Contents before embedding
-          const pageDict = srcPage.node
-          const contents = pageDict.lookup(pageDict.context.obj('Contents'))
-          if (contents) {
-            const [emb] = await merged.embedPages([srcPage])
-            newPage.drawPage(emb, { x: (pw - dw) / 2, y: (ph - dh) / 2, width: dw, height: dh })
-          }
-          // If no contents, keep blank page
-        }
+    // 页面级顺序：[{ f: 文件下标, p: 该文件内的页码(1-based) }]，决定合并结果的页面先后
+    let pageOrder: { f: number; p: number }[] | null = null
+    if (req.body.pageOrder) {
+      const raw = JSON.parse(req.body.pageOrder)
+      if (Array.isArray(raw) && raw.length) {
+        pageOrder = raw
+          .filter((e: { f?: number; p?: number }) =>
+            e && Number.isInteger(e.f) && Number.isInteger(e.p) && e.f! >= 0 && e.f! < files.length && e.p! >= 1)
+          .map((e: { f: number; p: number }) => ({ f: e.f, p: e.p }))
       }
     }
+
+    const docCache = new Map<number, PDFDocument>()
+    const loadDoc = async (i: number) => {
+      let d = docCache.get(i)
+      if (!d) { d = await PDFDocument.load(files[i].buffer); docCache.set(i, d) }
+      return d
+    }
+
+    const appendPage = async (src: PDFDocument, srcIndex: number) => {
+      if (!targetDims) {
+        const [copied] = await merged.copyPages(src, [srcIndex])
+        merged.addPage(copied)
+        return
+      }
+      const srcPage = src.getPage(srcIndex)
+      const { width: sw, height: sh } = srcPage.getSize()
+      const landscape = sw > sh
+      const [pw, ph] = landscape ? [targetDims[1], targetDims[0]] : targetDims
+      const scale = Math.min(pw / sw, ph / sh)
+      const dw = sw * scale, dh = sh * scale
+      const newPage = merged.addPage([pw, ph])
+      // Check if page has Contents before embedding
+      const pageDict = srcPage.node
+      const contents = pageDict.lookup(pageDict.context.obj('Contents'))
+      if (contents) {
+        const [emb] = await merged.embedPages([srcPage])
+        newPage.drawPage(emb, { x: (pw - dw) / 2, y: (ph - dh) / 2, width: dw, height: dh })
+      }
+      // If no contents, keep blank page
+    }
+
+    if (pageOrder) {
+      for (const { f, p } of pageOrder) {
+        const src = await loadDoc(f)
+        if (p > src.getPageCount()) continue
+        await appendPage(src, p - 1)
+      }
+    } else {
+      for (const idx of indices) {
+        const src = await loadDoc(idx)
+        for (let i = 0; i < src.getPageCount(); i++) await appendPage(src, i)
+      }
+    }
+
     const buf = Buffer.from(await merged.save({ useObjectStreams: true }))
     res.json({
       success: true,
@@ -258,17 +327,57 @@ app.post('/api/pdf-info', pdfUpload.single('pdf'), async (req, res) => {
   } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }) }
 })
 
+// 页面缩略图：按需渲染小尺寸预览图，供前端页面网格使用
+const THUMB_MIN_WIDTH = 80
+const THUMB_MAX_WIDTH = 600
+const THUMB_MAX_PAGES = 200
+
+app.post('/api/pdf-thumbs', pdfUpload.single('pdf'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '请上传 PDF 文件' })
+  try {
+    const maxWidth = Math.min(THUMB_MAX_WIDTH, Math.max(THUMB_MIN_WIDTH, parseInt(req.body.maxWidth) || 200))
+    const limit = Math.min(THUMB_MAX_PAGES, Math.max(1, parseInt(req.body.limit) || 60))
+    const pdfDoc = await pdfjsLib.getDocument(pdfjsLoadOptions(req.file.buffer)).promise
+    const total = pdfDoc.numPages
+    const cf = new NodeCanvasFactory()
+    let pages: { page: number; width: number; height: number; data: string; mime: string }[]
+    try {
+      pages = await mapWithConcurrency(
+        Array.from({ length: Math.min(total, limit) }, (_: unknown, i: number) => i + 1),
+        RENDER_CONCURRENCY,
+        async (n) => {
+          const page = await pdfDoc.getPage(n)
+          const base = page.getViewport({ scale: 1 })
+          const vp = page.getViewport({ scale: maxWidth / base.width })
+          const w = Math.max(1, Math.floor(vp.width))
+          const h = Math.max(1, Math.floor(vp.height))
+          const pair = cf.create(w, h)
+          await page.render({ canvasContext: pair.context, viewport: vp, canvasFactory: cf }).promise
+          const jpg = pair.canvas.toBuffer('image/jpeg', { quality: 0.72 })
+          cf.destroy(pair)
+          return { page: n, width: w, height: h, data: jpg.toString('base64'), mime: 'image/jpeg' }
+        }
+      )
+    } finally {
+      try { await pdfDoc.destroy() } catch { /* 忽略释放失败 */ }
+    }
+    res.json({ success: true, pageCount: total, rendered: pages.length, pages })
+  } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }) }
+})
+
 app.post('/api/split', pdfUpload.single('pdf'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '请上传 PDF 文件' })
   try {
     const src = await PDFDocument.load(req.file.buffer)
     const total = src.getPageCount()
+    // order：前端拖拽后的页面顺序（原始页号数组）；页码范围按该顺序解释
+    const seq = parseOrder(req.body.order, total)
     const mode = req.body.mode || 'each'
     let segments: [number, number][]
     if (mode === 'each') {
-      segments = Array.from({ length: total }, (_, i) => [i, i])
+      segments = Array.from({ length: seq.length }, (_, i) => [i, i])
     } else {
-      segments = parseRanges(req.body.ranges || '', total)
+      segments = parseRanges(req.body.ranges || '', seq.length)
       if (!segments.length) return res.status(400).json({ error: '无效的页码范围' })
     }
     const pad = String(segments.length).length
@@ -276,7 +385,8 @@ app.post('/api/split', pdfUpload.single('pdf'), async (req, res) => {
       for (let i = 0; i < segments.length; i++) {
         const [s, e] = segments[i]
         const out = await PDFDocument.create()
-        const pages = await out.copyPages(src, Array.from({ length: e - s + 1 }, (_, j) => s + j))
+        const indices = seq.slice(s, e + 1).map(n => n - 1)
+        const pages = await out.copyPages(src, indices)
         pages.forEach(p => out.addPage(p))
         const bytes = await out.save({ useObjectStreams: true })
         archive.append(Buffer.from(bytes), { name: `part_${String(i + 1).padStart(pad, '0')}.pdf` })
@@ -284,7 +394,7 @@ app.post('/api/split', pdfUpload.single('pdf'), async (req, res) => {
     })
     const baseName = origName(req.file).replace(/\.pdf$/i, '')
     res.json({
-      success: true, parts: segments.length, totalPages: total,
+      success: true, parts: segments.length, totalPages: seq.length,
       file: b64File(zipBuf, 'application/zip', `${baseName}_split.zip`),
     })
   } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }) }
@@ -299,23 +409,38 @@ app.post('/api/rotate', pdfUpload.single('pdf'), async (req, res) => {
     const pageNums: string | undefined = req.body.pages
     const doc = await PDFDocument.load(req.file.buffer)
     const total = doc.getPageCount()
+    // order：前端拖拽后的页面顺序（原始页号数组）；pages 参数按该顺序中的位置解释
+    const seq = parseOrder(req.body.order, total)
     let targetIndices: Set<number> | undefined
     if (pageNums) {
-      const segs = parseRanges(pageNums, total)
+      const segs = parseRanges(pageNums, seq.length)
       const set = new Set<number>()
       for (const [s, e] of segs) for (let i = s; i <= e; i++) set.add(i)
       targetIndices = set
     }
-    for (let i = 0; i < total; i++) {
-      if (targetIndices && !targetIndices.has(i)) continue
+    // 位置 → 原始页下标
+    const targetPages = new Set<number>()
+    if (targetIndices) for (const pos of targetIndices) targetPages.add(seq[pos] - 1)
+
+    for (const i of targetPages) {
       const page = doc.getPage(i)
       const current = page.getRotation().angle
       page.setRotation(degrees((current + angle + 360) % 360))
     }
-    const buf = Buffer.from(await doc.save({ useObjectStreams: true }))
+
+    let buf: Buffer
+    if (isIdentityOrder(seq)) {
+      buf = Buffer.from(await doc.save({ useObjectStreams: true }))
+    } else {
+      // 顺序被调整：重建文档以保留新的页序（copyPages 会带上 /Rotate）
+      const out = await PDFDocument.create()
+      const copied = await out.copyPages(doc, seq.map(n => n - 1))
+      copied.forEach(p => out.addPage(p))
+      buf = Buffer.from(await out.save({ useObjectStreams: true }))
+    }
     const baseName = origName(req.file).replace(/\.pdf$/i, '')
     res.json({
-      success: true, pageCount: total, size: buf.length,
+      success: true, pageCount: seq.length, size: buf.length,
       file: b64File(buf, 'application/pdf', `${baseName}_rotated.pdf`),
     })
   } catch (e: unknown) { res.status(500).json({ error: (e as Error).message }) }
@@ -328,19 +453,33 @@ app.post('/api/remove-pages', pdfUpload.single('pdf'), async (req, res) => {
     const total = doc.getPageCount()
     const pages: string = req.body.pages
     if (!pages) return res.status(400).json({ error: '请指定要删除的页码' })
-    const toRemove = new Set(
-      pages.replace(/[，｜|]/g, ',').split(',').map(s => parseInt(s.trim()) - 1).filter(i => i >= 0 && i < total)
-    )
+    // order：前端拖拽后的页面顺序（原始页号数组）；pages 参数按该顺序中的位置解释
+    const seq = parseOrder(req.body.order, total)
+    const toRemove = new Set<number>()
+    for (const [s, e] of parseRanges(pages, seq.length)) {
+      for (let i = s; i <= e; i++) toRemove.add(seq[i] - 1)
+    }
     if (toRemove.size === 0) return res.status(400).json({ error: '无有效页码' })
     if (toRemove.size >= total) return res.status(400).json({ error: '不能删除全部页面' })
-    for (let i = total - 1; i >= 0; i--) {
-      if (toRemove.has(i)) doc.removePage(i)
+
+    let buf: Buffer
+    if (isIdentityOrder(seq)) {
+      for (let i = total - 1; i >= 0; i--) {
+        if (toRemove.has(i)) doc.removePage(i)
+      }
+      buf = Buffer.from(await doc.save({ useObjectStreams: true }))
+    } else {
+      // 顺序被调整：重建文档以保留新的页序
+      const out = await PDFDocument.create()
+      const keep = seq.map(n => n - 1).filter(i => !toRemove.has(i))
+      const copied = await out.copyPages(doc, keep)
+      copied.forEach(p => out.addPage(p))
+      buf = Buffer.from(await out.save({ useObjectStreams: true }))
     }
-    const buf = Buffer.from(await doc.save({ useObjectStreams: true }))
     const baseName = origName(req.file).replace(/\.pdf$/i, '')
     res.json({
       success: true,
-      originalPages: total, remainingPages: doc.getPageCount(),
+      originalPages: total, remainingPages: total - toRemove.size,
       removedPages: toRemove.size, size: buf.length,
       file: b64File(buf, 'application/pdf', `${baseName}_removed.pdf`),
     })
@@ -354,11 +493,14 @@ app.post('/api/extract-pages', pdfUpload.single('pdf'), async (req, res) => {
     const total = src.getPageCount()
     const pages: string = req.body.pages
     if (!pages) return res.status(400).json({ error: '请指定要提取的页码' })
-    const segments = parseRanges(pages, total)
+    // order：前端拖拽后的页面顺序（原始页号数组）；pages 参数按该顺序中的位置解释
+    const seq = parseOrder(req.body.order, total)
+    const segments = parseRanges(pages, seq.length)
     if (!segments.length) return res.status(400).json({ error: '无有效页码范围' })
-    const indices: number[] = []
-    for (const [s, e] of segments) for (let i = s; i <= e; i++) indices.push(i)
-    const uniqueIndices = [...new Set(indices)].sort((a, b) => a - b)
+    const positions: number[] = []
+    for (const [s, e] of segments) for (let i = s; i <= e; i++) positions.push(i)
+    const uniquePositions = [...new Set(positions)].sort((a, b) => a - b)
+    const uniqueIndices = uniquePositions.map(pos => seq[pos] - 1)
     const dest = await PDFDocument.create()
     const copied = await dest.copyPages(src, uniqueIndices)
     copied.forEach(p => dest.addPage(p))
@@ -373,7 +515,7 @@ app.post('/api/extract-pages', pdfUpload.single('pdf'), async (req, res) => {
 })
 
 async function extractPdfTextByPage(buf: Buffer): Promise<{ pages: string[]; total: number }> {
-  const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise
+  const pdfDoc = await pdfjsLib.getDocument(pdfjsLoadOptions(buf)).promise
   const pages: string[] = []
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i)
@@ -468,7 +610,7 @@ app.post('/api/pdf-to-img', pdfUpload.single('pdf'), async (req, res) => {
   try {
     const dpi = Math.min(300, Math.max(72, parseInt(req.body.dpi) || 150))
     const scale = dpi / 72
-    const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(req.file.buffer), verbosity: 0 }).promise
+    const pdfDoc = await pdfjsLib.getDocument(pdfjsLoadOptions(req.file.buffer)).promise
     const total = pdfDoc.numPages
     const cf = new NodeCanvasFactory()
     const base = origName(req.file).replace(/\.pdf$/i, '')

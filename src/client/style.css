@@ -53,6 +53,34 @@
   .card-wide {
     @apply max-w-2xl;
   }
+  /* 宽屏下放大内容区，避免两侧大片留白。
+     两级约束：min(rem 上限, vw 比例) ——
+       vw 分量让卡片宽度随视口「连续」增长（断点之间不会突然跳变），
+       rem 上限避免超宽屏把单栏表单拉伸变形、也给出超宽屏的收敛上限。 */
+  @media (min-width: 1024px) {
+    .card { max-width: min(42rem, 92vw); }
+    .card.card-wide { max-width: min(60rem, 76vw); }
+  }
+  @media (min-width: 1280px) {
+    .card { max-width: min(48rem, 90vw); }
+    .card.card-wide { max-width: min(80rem, 82vw); }
+  }
+  @media (min-width: 1536px) {
+    .card { max-width: min(52rem, 88vw); }
+    .card.card-wide { max-width: min(104rem, 86vw); }
+  }
+  @media (min-width: 1920px) {
+    .card { max-width: min(56rem, 86vw); }
+    .card.card-wide { max-width: min(128rem, 86vw); }
+  }
+  @media (min-width: 2560px) {
+    .card { max-width: min(60rem, 84vw); }
+    .card.card-wide { max-width: min(160rem, 86vw); }
+  }
+  @media (min-width: 3200px) {
+    .card { max-width: min(64rem, 82vw); }
+    .card.card-wide { max-width: min(176rem, 86vw); }
+  }
   .section-title {
     @apply text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5;
   }
@@ -126,5 +154,35 @@
   }
   .tab-btn.active {
     @apply text-indigo-500 border-b-2 border-indigo-500;
+  }
+  .thumb-scroll {
+    @apply pr-2;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+  .dark .thumb-scroll {
+    scrollbar-color: #4b5563 transparent;
+  }
+  .thumb-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .thumb-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .thumb-scroll::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .dark .thumb-scroll::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+  .thumb-scroll::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+  .dark .thumb-scroll::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
   }
 }
